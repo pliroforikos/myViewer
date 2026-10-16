@@ -29,6 +29,7 @@
         <Border x:Name="ViewportBorder"
                 Background="#0A0A0D"
                 ClipToBounds="True"
+                SizeChanged="ViewportBorder_SizeChanged"
                 MouseDown="Viewport_MouseDown"
                 MouseMove="Viewport_MouseMove"
                 MouseUp="Viewport_MouseUp"
@@ -39,11 +40,7 @@
                        RenderOptions.EdgeMode="Aliased"
                        Stretch="None">
                     <Image.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="ImageScale" ScaleX="1" ScaleY="1" />
-                            <RotateTransform x:Name="ImageRotate" Angle="0" />
-                            <TranslateTransform x:Name="ImageTranslate" X="0" Y="0" />
-                        </TransformGroup>
+                        <MatrixTransform x:Name="ImageMatrixTransform" />
                     </Image.RenderTransform>
                 </Image>
             </Canvas>

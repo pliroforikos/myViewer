@@ -23,8 +23,8 @@ public partial class MainWindow : Window
 
     // Pan & Zoom state
     private double _scale = 1.0;
-    private double _translateX = 0.0;
-    private double _translateY = 0.0;
+    private double _centerX = 0.0;
+    private double _centerY = 0.0;
     private int _rotation = 0;
     private bool _flipH = false;
     private bool _isFitMode = true;
@@ -301,20 +301,32 @@ public partial class MainWindow : Window
         double viewportW = ViewportBorder.ActualWidth;
         double viewportH = ViewportBorder.ActualHeight;
 
-        if (viewportW <= 0 || viewportH <= 0) return;
+        if (viewportW <= 0 || viewportH <= 0)
+        {
+            Dispatcher.BeginInvoke(new Action(FitToScreen), DispatcherPriority.Loaded);
+            return;
+        }
 
         // Calculate dimensions accounting for 90/270 rotation
         bool isRotated90 = (_rotation % 180 != 0);
         double effW = isRotated90 ? _currentData.PixelHeight : _currentData.PixelWidth;
         double effH = isRotated90 ? _currentData.PixelWidth : _currentData.PixelHeight;
 
-        double scaleX = viewportW / effW;
-        double scaleY = viewportH / effH;
+        if (effW <= 0 || effH <= 0) return;
+
+        // Add padding on edges so photo fits comfortably within borders
+        double padX = Math.Min(16.0, viewportW * 0.02);
+        double padY = Math.Min(16.0, viewportH * 0.02);
+        double availW = Math.Max(10.0, viewportW - padX * 2);
+        double availH = Math.Max(10.0, viewportH - padY * 2);
+
+        double scaleX = availW / effW;
+        double scaleY = availH / effH;
         _scale = Math.Min(scaleX, scaleY);
 
-        // Center on screen
-        _translateX = (viewportW - _currentData.PixelWidth * _scale) / 2.0;
-        _translateY = (viewportH - _currentData.PixelHeight * _scale) / 2.0;
+        // Center image center exactly at viewport center
+        _centerX = viewportW / 2.0;
+        _centerY = viewportH / 2.0;
         _isFitMode = true;
 
         ApplyTransforms();
@@ -328,8 +340,8 @@ public partial class MainWindow : Window
         double viewportH = ViewportBorder.ActualHeight;
 
         _scale = 1.0;
-        _translateX = (viewportW - _currentData.PixelWidth) / 2.0;
-        _translateY = (viewportH - _currentData.PixelHeight) / 2.0;
+        _centerX = viewportW > 0 ? viewportW / 2.0 : _currentData.PixelWidth / 2.0;
+        _centerY = viewportH > 0 ? viewportH / 2.0 : _currentData.PixelHeight / 2.0;
         _isFitMode = false;
 
         ApplyTransforms();
@@ -340,14 +352,14 @@ public partial class MainWindow : Window
         if (_currentData == null) return;
 
         double oldScale = _scale;
-        double newScale = Math.Clamp(_scale * factor, 0.02, 50.0);
-        if (Math.Abs(newScale - oldScale) < 0.0001) return;
+        double newScale = Math.Clamp(_scale * factor, 0.01, 50.0);
+        if (Math.Abs(newScale - oldScale) < 0.00001) return;
 
         double actualRatio = newScale / oldScale;
 
-        // Anchor zoom around cursor position
-        _translateX = mousePos.X - (mousePos.X - _translateX) * actualRatio;
-        _translateY = mousePos.Y - (mousePos.Y - _translateY) * actualRatio;
+        // Anchor zoom around cursor position: mousePos remains stationary on screen
+        _centerX = mousePos.X + (_centerX - mousePos.X) * actualRatio;
+        _centerY = mousePos.Y + (_centerY - mousePos.Y) * actualRatio;
         _scale = newScale;
         _isFitMode = false;
 
@@ -356,21 +368,28 @@ public partial class MainWindow : Window
 
     private void ApplyTransforms()
     {
-        ImageScale.ScaleX = _flipH ? -_scale : _scale;
-        ImageScale.ScaleY = _scale;
-        ImageRotate.Angle = _rotation;
+        if (_currentData == null) return;
 
-        // Rotate around image center
-        if (_currentData != null)
-        {
-            ImageRotate.CenterX = _currentData.PixelWidth / 2.0;
-            ImageRotate.CenterY = _currentData.PixelHeight / 2.0;
-            ImageScale.CenterX = _currentData.PixelWidth / 2.0;
-            ImageScale.CenterY = _currentData.PixelHeight / 2.0;
-        }
+        var matrix = Matrix.Identity;
 
-        ImageTranslate.X = _translateX;
-        ImageTranslate.Y = _translateY;
+        // 1. Move image center to origin (0, 0)
+        matrix.Translate(-_currentData.PixelWidth / 2.0, -_currentData.PixelHeight / 2.0);
+
+        // 2. Horizontal flip around center
+        if (_flipH)
+            matrix.Scale(-1.0, 1.0);
+
+        // 3. Rotate around center
+        if (_rotation != 0)
+            matrix.Rotate(_rotation);
+
+        // 4. Scale around center
+        matrix.Scale(_scale, _scale);
+
+        // 5. Place image center at screen position (_centerX, _centerY)
+        matrix.Translate(_centerX, _centerY);
+
+        ImageMatrixTransform.Matrix = matrix;
 
         TxtZoomLevel.Text = $"{Math.Round(_scale * 100)}%";
     }
@@ -390,12 +409,9 @@ public partial class MainWindow : Window
             if (e.ClickCount == 2)
             {
                 // Double-click: toggle Fit to Screen vs Native Size (1:1)
-                if (_isFitMode || Math.Abs(_scale - 1.0) < 0.05)
+                if (_isFitMode)
                 {
-                    if (Math.Abs(_scale - 1.0) < 0.05)
-                        FitToScreen();
-                    else
-                        NativeSize();
+                    NativeSize();
                 }
                 else
                 {
@@ -421,8 +437,8 @@ public partial class MainWindow : Window
             double deltaX = current.X - _lastMousePos.X;
             double deltaY = current.Y - _lastMousePos.Y;
 
-            _translateX += deltaX;
-            _translateY += deltaY;
+            _centerX += deltaX;
+            _centerY += deltaY;
             _lastMousePos = current;
             _isFitMode = false;
 
@@ -438,6 +454,14 @@ public partial class MainWindow : Window
             _isPanning = false;
             ViewportBorder.ReleaseMouseCapture();
             ViewportBorder.Cursor = Cursors.Arrow;
+        }
+    }
+
+    private void ViewportBorder_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_isFitMode)
+        {
+            FitToScreen();
         }
     }
 
