@@ -74,10 +74,11 @@
                 </StackPanel>
 
                 <!-- Right: Sort Pill & Window Controls -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <!-- About / Περί Button -->
                     <Button x:Name="BtnAbout"
                             Click="BtnAbout_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Background="#1F1F2B"
                             BorderBrush="#333345"
                             BorderThickness="1"
@@ -100,6 +101,7 @@
                     <!-- Sort Mode Button -->
                     <Button x:Name="BtnSortMode"
                             Click="BtnSort_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Background="#1F1F2B"
                             BorderBrush="#333345"
                             BorderThickness="1"
@@ -121,7 +123,7 @@
                     </Button>
 
                     <!-- Window Buttons -->
-                    <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource TitleBarButton}" Click="BtnMinimize_Click" ToolTip="Minimize">
                             <Path Data="{StaticResource IconMinimize}" Fill="{StaticResource TextSecondaryBrush}" Width="10" Height="10" Stretch="Uniform" />
                         </Button>
@@ -522,6 +524,8 @@
         <!-- About / Περί Modal Overlay (Spans entire window) -->
         <Border x:Name="AboutOverlay"
                 Grid.Row="0" Grid.RowSpan="2"
+                Panel.ZIndex="1000"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
                 Background="#CC050508"
                 Visibility="Collapsed"
                 MouseDown="AboutOverlay_BackgroundMouseDown">
