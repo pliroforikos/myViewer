@@ -181,8 +181,8 @@ public static class ImageLoader
             var bitmap = BitmapSource.Create(
                 width,
                 height,
-                magick.Density.X > 0 ? magick.Density.X : 96,
-                magick.Density.Y > 0 ? magick.Density.Y : 96,
+                96,
+                96,
                 PixelFormats.Bgra32,
                 null,
                 bgraPixels,

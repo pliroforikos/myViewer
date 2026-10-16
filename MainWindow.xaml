@@ -25,68 +25,14 @@
     </shell:WindowChrome.WindowChrome>
 
     <Grid Background="{StaticResource BgDarkBrush}" ClipToBounds="True">
-        <!-- Main Viewport for Image Display -->
-        <Border x:Name="ViewportBorder"
-                Background="#0A0A0D"
-                ClipToBounds="True"
-                SizeChanged="ViewportBorder_SizeChanged"
-                MouseDown="Viewport_MouseDown"
-                MouseMove="Viewport_MouseMove"
-                MouseUp="Viewport_MouseUp"
-                MouseWheel="Viewport_MouseWheel">
-            <Canvas x:Name="ImageCanvas" ClipToBounds="True">
-                <Image x:Name="DisplayImage"
-                       RenderOptions.BitmapScalingMode="HighQuality"
-                       RenderOptions.EdgeMode="Aliased"
-                       Stretch="None">
-                    <Image.RenderTransform>
-                        <MatrixTransform x:Name="ImageMatrixTransform" />
-                    </Image.RenderTransform>
-                </Image>
-            </Canvas>
-        </Border>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!-- Empty State / Welcome Screen (Shown when no image is loaded) -->
-        <Border x:Name="EmptyStateOverlay"
-                Background="#101015"
-                Visibility="Visible">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="520">
-                <Border Width="96" Height="96" CornerRadius="24" Background="#1C1C24" BorderBrush="#2F2F3D" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,20">
-                    <Image Source="app_icon_256.png" Width="72" Height="72" />
-                </Border>
-                <TextBlock Text="myView" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6" />
-                <TextBlock Text="Ultra-Fast Lightweight Image Viewer" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,24" />
-                
-                <Button Click="BtnOpen_Click"
-                        Padding="24,12"
-                        Background="#00D2FF"
-                        Foreground="#000000"
-                        FontWeight="SemiBold"
-                        FontSize="14"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        HorizontalAlignment="Center"
-                        Margin="0,0,0,24">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="20" />
-                        </Style>
-                    </Button.Resources>
-                    <StackPanel Orientation="Horizontal">
-                        <Path Data="{StaticResource IconFolder}" Fill="#000000" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
-                        <TextBlock Text="Open Image (Ctrl + O)" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-
-                <TextBlock Text="Drag and drop any image or folder here" FontSize="13" Foreground="#6B7280" HorizontalAlignment="Center" Margin="0,0,0,16" />
-                <TextBlock Text="Supported: JPG, PNG, BMP, RAW (CR2, NEF, ARW, DNG, etc.), PSD/PSB, SVG Vector"
-                           FontSize="11.5" Foreground="#4B5563" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-
-        <!-- Top Title Bar / Header Overlay -->
-        <Border x:Name="TopHeaderOverlay"
-                VerticalAlignment="Top"
+        <!-- Top Title Bar / Header Overlay (Row 0) -->
+        <Border Grid.Row="0"
+                x:Name="TopHeaderOverlay"
                 Height="42"
                 Background="#D9111116"
                 BorderBrush="#252530"
@@ -167,6 +113,67 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Main Workspace Area (Row 1) -->
+        <Grid Grid.Row="1" ClipToBounds="True">
+            <!-- Main Viewport for Image Display -->
+            <Border x:Name="ViewportBorder"
+                    Background="#0A0A0D"
+                    ClipToBounds="True"
+                    SizeChanged="ViewportBorder_SizeChanged"
+                    MouseDown="Viewport_MouseDown"
+                    MouseMove="Viewport_MouseMove"
+                    MouseUp="Viewport_MouseUp"
+                    MouseWheel="Viewport_MouseWheel">
+                <Canvas x:Name="ImageCanvas" ClipToBounds="False">
+                    <Image x:Name="DisplayImage"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           RenderOptions.EdgeMode="Aliased"
+                           Stretch="Fill">
+                        <Image.RenderTransform>
+                            <MatrixTransform x:Name="ImageMatrixTransform" />
+                        </Image.RenderTransform>
+                    </Image>
+                </Canvas>
+            </Border>
+
+            <!-- Empty State / Welcome Screen (Shown when no image is loaded) -->
+            <Border x:Name="EmptyStateOverlay"
+                    Background="#101015"
+                    Visibility="Visible">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="520">
+                    <Border Width="96" Height="96" CornerRadius="24" Background="#1C1C24" BorderBrush="#2F2F3D" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <Image Source="app_icon_256.png" Width="72" Height="72" />
+                    </Border>
+                    <TextBlock Text="myView" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6" />
+                    <TextBlock Text="Ultra-Fast Lightweight Image Viewer" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,24" />
+                    
+                    <Button Click="BtnOpen_Click"
+                            Padding="24,12"
+                            Background="#00D2FF"
+                            Foreground="#000000"
+                            FontWeight="SemiBold"
+                            FontSize="14"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,24">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="20" />
+                            </Style>
+                        </Button.Resources>
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconFolder}" Fill="#000000" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+                            <TextBlock Text="Open Image (Ctrl + O)" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Text="Drag and drop any image or folder here" FontSize="13" Foreground="#6B7280" HorizontalAlignment="Center" Margin="0,0,0,16" />
+                    <TextBlock Text="Supported: JPG, PNG, BMP, RAW (CR2, NEF, ARW, DNG, etc.), PSD/PSB, SVG Vector"
+                               FontSize="11.5" Foreground="#4B5563" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
 
         <!-- Floating Bottom HUD Bar (Auto-hiding overlay) -->
         <Border x:Name="BottomHudBar"
@@ -271,7 +278,7 @@
                 HorizontalAlignment="Right"
                 VerticalAlignment="Stretch"
                 Width="380"
-                Margin="0,42,0,0"
+                Margin="0"
                 Background="#EB111116"
                 BorderBrush="#292938"
                 BorderThickness="1,0,0,0"
@@ -477,7 +484,7 @@
         <Border x:Name="LoadingBadge"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                Margin="0,52,24,0"
+                Margin="0,16,24,0"
                 Background="#D91E1E28"
                 BorderBrush="{StaticResource AccentBrush}"
                 BorderThickness="1"
@@ -488,5 +495,6 @@
                 <TextBlock Text="⚡ Loading..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
             </StackPanel>
         </Border>
+        </Grid>
     </Grid>
 </Window>
