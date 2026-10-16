@@ -597,7 +597,15 @@ public partial class MainWindow : Window
                 break;
 
             case Key.F1:
-                AboutOverlay.Visibility = AboutOverlay.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+                if (AboutOverlay.Visibility == Visibility.Visible)
+                {
+                    AboutOverlay.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    UpdateDefaultStatusUi();
+                    AboutOverlay.Visibility = Visibility.Visible;
+                }
                 e.Handled = true;
                 break;
 
@@ -862,7 +870,48 @@ public partial class MainWindow : Window
 
     private void BtnAbout_Click(object sender, RoutedEventArgs e)
     {
+        UpdateDefaultStatusUi();
         AboutOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateDefaultStatusUi()
+    {
+        if (FileAssociationService.IsRegistered())
+        {
+            TxtDefaultStatus.Text = "✓ Το myView είναι καταχωρημένο στα Windows. Πατήστε για άνοιγμα των ρυθμίσεων προεπιλογής.";
+            TxtBtnSetAsDefault.Text = "⚙️ Ρυθμίσεις Προεπιλογής";
+        }
+        else
+        {
+            TxtDefaultStatus.Text = "Καταχώριση στα Windows και άνοιγμα ρυθμίσεων προεπιλογής για όλα τα υποστηριζόμενα αρχεία.";
+            TxtBtnSetAsDefault.Text = "🛠️ Ορισμός ως Προεπιλογή";
+        }
+    }
+
+    private void BtnSetAsDefault_Click(object sender, RoutedEventArgs e)
+    {
+        bool ok = FileAssociationService.RegisterFileAssociations(out string message);
+        UpdateDefaultStatusUi();
+
+        if (ok)
+        {
+            FileAssociationService.OpenWindowsDefaultAppsSettings();
+            MessageBox.Show(
+                "Το myView καταχωρήθηκε επιτυχώς στο σύστημα!\n\n" +
+                "Ανοίγουν αυτόματα οι Ρυθμίσεις Προεπιλεγμένων Εφαρμογών των Windows.\n" +
+                "Επιλέξτε το 'myView' και πατήστε 'Ορισμός ως προεπιλογή' (Set default) για να ολοκληρώσετε.",
+                "Προεπιλεγμένη Εφαρμογή - myView",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        else
+        {
+            MessageBox.Show(
+                $"Αποτυχία καταχώρισης στο σύστημα:\n{message}",
+                "myView",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void BtnCloseAbout_Click(object sender, RoutedEventArgs e)

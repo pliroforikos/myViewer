@@ -556,7 +556,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.1" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.2" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -605,6 +605,46 @@
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Default Apps Card -->
+                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="⚡" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Προεπιλεγμένη Εφαρμογή (Default Viewer)" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="TxtDefaultStatus"
+                                           Text="Καταχώριση στα Windows και άνοιγμα ρυθμίσεων προεπιλογής για όλα τα υποστηριζόμενα αρχεία."
+                                           FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    x:Name="BtnSetAsDefault"
+                                    Click="BtnSetAsDefault_Click"
+                                    Background="#252538"
+                                    BorderBrush="{StaticResource AccentBrush}"
+                                    BorderThickness="1"
+                                    Foreground="{StaticResource AccentBrush}"
+                                    FontWeight="SemiBold"
+                                    FontSize="12"
+                                    Padding="12,7"
+                                    Cursor="Hand"
+                                    VerticalAlignment="Center">
+                                <Button.Resources>
+                                    <Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="TxtBtnSetAsDefault" Text="🛠️ Ορισμός ως Προεπιλογή" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </Border>
 
