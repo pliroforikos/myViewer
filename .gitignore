@@ -11,3 +11,8 @@
 
 ## Test logs
 test_results.log
+
+## Release distributions
+dist/
+*.zip
+
