@@ -1,0 +1,115 @@
+# myView ⚡
+**Ultra-Fast, Lightweight Image & Vector Viewer for Windows**
+
+<p align="center">
+  <img src="app_icon_256.png" width="128" height="128" alt="myView Logo" />
+  <br><br>
+  <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 10" />
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows" />
+  <img src="https://img.shields.io/badge/Speed-%3C5ms%20Decoding-10B981?style=flat-square" alt="Decode Speed" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License" />
+  <br><br>
+  <b>myView</b> - Σχεδιασμένο για αστραπιαία ταχύτητα, ελάχιστη κατανάλωση πόρων και υποστήριξη επαγγελματικών format.
+</p>
+
+---
+
+## 📚 Αναλυτική Τεκμηρίωση (Documentation)
+
+- 🏗️ **[Αρχιτεκτονική & Pipeline (Architecture)](docs/ARCHITECTURE.md)**: Ανάλυση του υβριδικού συστήματος αποκωδικοποίησης (WIC, LibRaw, SharpVectors), LRU cache και μαθηματικών zoom.
+- 🎨 **[Υποστηριζόμενα Formats (Supported Formats)](docs/SUPPORTED_FORMATS.md)**: Πλήρης λίστα όλων των υποστηριζόμενων camera RAW, raster, Photoshop και διανυσματικών αρχείων.
+- ⌨️ **[Συντομεύσεις Πληκτρολογίου & Ποντικιού (Shortcuts)](docs/KEYBOARD_SHORTCUTS.md)**: Πλήρης οδηγός χειρισμού και gestures.
+- 📄 **[Άδεια Χρήσης (License)](LICENSE)**: MIT License.
+
+---
+
+## 🚀 Χαρακτηριστικά & Λειτουργίες (Features)
+
+1. **Ασύλληπτη Ταχύτητα & Ελαφρύ Μέγεθος:**
+   - Ταχύτατη αποκωδικοποίηση μέσω GPU Hardware Acceleration (DirectX/WIC) για standard εικόνες (~2-5ms).
+   - Ασύγχρονο πολυνηματικό decoding (Task-based) που δεν μπλοκάρει ποτέ το UI.
+   - **Background Pre-caching:** Αυτόματη προφόρτωση επόμενης και προηγούμενης εικόνας στο παρασκήνιο (LRU cache) ώστε η εναλλαγή με βελάκια να είναι απολύτως στιγμιαία (0ms latency).
+
+2. **Υποστηριζόμενα Αρχεία (Supported Formats):**
+   - **Standard Raster:** JPG, JPEG, PNG, BMP, GIF, WebP, TIFF, ICO.
+   - **Vector / Inkscape:** SVG, SVGZ (άπειρο ζουμ χωρίς pixelation μέσω vector engine).
+   - **Adobe Photoshop:** PSD, PSB (πλήρης υποστήριξη composite στρωμάτων).
+   - **Camera RAW:** Πλήρης επεξεργασία αισθητήρα (Full RAW demosaicing) για CR2, CR3 (Canon), NEF, NRW (Nikon), ARW, SRF, SR2 (Sony), DNG (Adobe/Leica/Mobile), ORF (Olympus), RW2 (Panasonic), PEF, PTX (Pentax), RAF (Fuji), X3F (Sigma), SRW (Samsung).
+
+3. **Πλοήγηση & Ταξινόμηση (Navigation & Sorting):**
+   - **Βελάκι Δεξιά / Αριστερά (Right / Left Arrow):** Επόμενη / Προηγούμενη εικόνα.
+   - **Home:** Πρώτη εικόνα του τρέχοντος φακέλου.
+   - **End:** Τελευταία εικόνα του φακέλου.
+   - **Ταξινόμηση (Sort):** Αλφαβητικά (A-Z, Z-A με natural numeric sorting: π.χ. `img2` πριν το `img10`), ανά Ημερομηνία τροποποίησης (Νεότερα/Παλαιότερα) και ανά Μέγεθος αρχείου. Πλήκτρο `S` ή κλικ στο badge ταξινόμησης.
+
+4. **Έλεγχος Μεγέθυνσης & Προβολής (Pan & Zoom):**
+   - **Ροδέλα Ποντικιού (Mouse Wheel):** Ομαλό Zoom In & Out εστιασμένο ακριβώς στη θέση του κέρσορα.
+   - **Σύρσιμο (Click & Drag):** Ελεύθερη μετακίνηση (Pan) όταν η εικόνα είναι σε μεγέθυνση.
+   - **Fit Screen (F ή 0):** Αυτόματη προσαρμογή στο παράθυρο με διατήρηση των αναλογιών.
+   - **Native Size 100% 1:1 (1):** Προβολή σε πραγματικές διαστάσεις pixel.
+   - **Double-click:** Εναλλαγή μεταξύ Fit και 100%.
+   - **Περιστροφή & Αναστροφή:** Rotate 90° Clockwise (`R`), Counter-Clockwise (`L`), Flip Horizontal (`H`).
+
+5. **Αναλυτικό Πάνελ EXIF & Metadata (`I`):**
+   - Αναδιπλούμενο, ημιδιαφανές πλαϊνό πάνελ χωρίς διακοπή της προβολής.
+   - **Camera & Lens:** Κατασκευαστής, μοντέλο μηχανής, φακός.
+   - **Exposure Badges:** Ταχύτητα κλείστρου (Shutter), Διάφραγμα (f-number), Ευαισθησία (ISO), Εστιακό μήκος (Focal length), Αντιστάθμιση έκθεσης (Exposure Bias).
+   - **Shooting Conditions:** Φλας, White Balance, Φωτομέτρηση (Metering).
+   - **GPS Coordinates:** Γεωγραφικό πλάτος/μήκος με απευθείας κουμπί προβολής στο Google Maps.
+   - **Αναζήτηση & Πλήρες Δέντρο:** Search box για άμεσο φιλτράρισμα όλων των raw tags.
+   - **Αντιγραφή στο Clipboard:** Κουμπί για αντιγραφή όλων των στοιχείων με ένα κλικ.
+
+6. **Μοντέρνο Minimalist Dark UI:**
+   - Μέγιστη επιφάνεια προβολής της εικόνας.
+   - Floating HUD μπάρα εργαλείων που εξαφανίζεται αυτόματα όταν το ποντίκι είναι αδρανές για 2.5 δευτερόλεπτα και επανέρχεται με την κίνηση.
+   - Πλήρης υποστήριξη **Drag & Drop** (σύρετε οποιαδήποτε εικόνα ή φάκελο στο παράθυρο).
+   - Υποστήριξη Command-line (π.χ. `myView.exe "C:\Photos\image.jpg"`).
+   - Πλήρης οθόνη (**Fullscreen**, `F11`).
+
+---
+
+## ⌨️ Συντομεύσεις Πληκτρολογίου (Keyboard Shortcuts)
+
+| Πλήκτρο | Ενέργεια |
+| :--- | :--- |
+| **`→` / `Space` / `Page Down`** | Επόμενη εικόνα (Next Image) |
+| **`←` / `Backspace` / `Page Up`** | Προηγούμενη εικόνα (Previous Image) |
+| **`Home`** | Πρώτη εικόνα φακέλου (First Image) |
+| **`End`** | Τελευταία εικόνα φακέλου (Last Image) |
+| **`+` / `=` / `Wheel Up`** | Zoom In (Μεγέθυνση) |
+| **`-` / `Wheel Down`** | Zoom Out (Σμίκρυνση) |
+| **`F` / `0`** | Προσαρμογή στην οθόνη (Fit to Screen) |
+| **`1`** | Πραγματικό μέγεθος 100% (1:1 Native Size) |
+| **`Διπλό Κλικ (Double Click)`** | Εναλλαγή μεταξύ Fit και 100% |
+| **`R`** | Δεξιόστροφη περιστροφή 90° (Rotate Right) |
+| **`L`** | Αριστερόστροφη περιστροφή 90° (Rotate Left) |
+| **`H`** | Οριζόντια αναστροφή (Flip Horizontal) |
+| **`S`** | Αλλαγή σειράς ταξινόμησης (Cycle Sort Mode) |
+| **`I`** | Άνοιγμα / Κλείσιμο πάνελ EXIF (Toggle EXIF Sidebar) |
+| **`F11`** | Πλήρης οθόνη (Toggle Fullscreen) |
+| **`Ctrl + O` / `O`** | Άνοιγμα αρχείου εικόνας (Open File) |
+| **`Delete`** | Διαγραφή τρέχουσας εικόνας (με επιβεβαίωση) |
+| **`Esc`** | Κλείσιμο πάνελ EXIF ή έξοδος από Fullscreen |
+
+---
+
+## 🛠️ Εκτέλεση & Μεταγλώττιση (Build & Run)
+
+Απαιτήσεις: [.NET 10 SDK](https://dotnet.microsoft.com/)
+
+```powershell
+# Μεταγλώττιση (Build)
+dotnet build
+
+# Εκτέλεση αυτοματοποιημένων δοκιμών (Automated Self-Test)
+dotnet run -- --test
+
+# Εκτέλεση εφαρμογής (Run Application)
+dotnet run
+
+# Δημιουργία Standalone Release Build
+dotnet publish -c Release -o bin\Release\Publish
+```
+
+Το εκτελέσιμο αρχείο παράγεται στο:
+`bin\Release\Publish\myView.exe`
