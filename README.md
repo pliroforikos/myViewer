@@ -119,6 +119,19 @@
 
 ---
 
+## 📦 Λήψη & Εγκατάσταση (Installation & Download)
+
+Μπορείτε να κατεβάσετε την τελευταία έκδοση από τα **[GitHub Releases](https://github.com/pliroforikos/myViewer/releases)**:
+
+| Αρχείο | Τύπος | Περιγραφή |
+| :--- | :--- | :--- |
+| **`myView-v1.0.2-setup.exe`** | **Windows Setup Installer** *(Προτεινόμενο)* | Πλήρης εγκαταστάτης (Inno Setup) με οδηγό βήμα-προς-βήμα, συντομεύσεις, απεγκατάσταση και αυτόματη δήλωση προεπιλογής. Δεν απαιτείται .NET. |
+| **`myView-v1.0.2-lightweight-setup.exe`** | **Lightweight Setup** (~11 MB) | Ελαφρύς εγκαταστάτης για συστήματα που διαθέτουν ήδη εγκατεστημένο το .NET 10 Runtime. |
+| **`myView-v1.0.2-standalone-win-x64.zip`** | **Portable Zip (Standalone)** | Φορητή έκδοση σε zip — απλώς αποσυμπιέστε και τρέξτε το `myView.exe` χωρίς καμία εγκατάσταση. |
+| **`myView-v1.0.2-windows-x64.zip`** | **Portable Zip (Lightweight)** | Φορητή έκδοση (~13 MB) για χρήστες με .NET 10. |
+
+---
+
 ## 🛠️ Εκτέλεση & Μεταγλώττιση (Build & Run)
 
 Απαιτήσεις: [.NET 10 SDK](https://dotnet.microsoft.com/)
@@ -134,8 +147,8 @@ dotnet run -- --test
 dotnet run
 
 # Δημιουργία Standalone Release Build
-dotnet publish -c Release -o bin\Release\Publish
-```
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/myView-standalone-win-x64
 
-Το εκτελέσιμο αρχείο παράγεται στο:
-`bin\Release\Publish\myView.exe`
+# Δημιουργία Setup Installer (απαιτεί Inno Setup 6)
+iscc installer\myView_Standalone_Setup.iss
+```
