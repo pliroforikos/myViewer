@@ -596,8 +596,17 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
 
+            case Key.F1:
+                AboutOverlay.Visibility = AboutOverlay.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+                e.Handled = true;
+                break;
+
             case Key.Escape:
-                if (ExifSidebar.Visibility == Visibility.Visible)
+                if (AboutOverlay.Visibility == Visibility.Visible)
+                {
+                    AboutOverlay.Visibility = Visibility.Collapsed;
+                }
+                else if (ExifSidebar.Visibility == Visibility.Visible)
                 {
                     ExifSidebar.Visibility = Visibility.Collapsed;
                 }
@@ -846,6 +855,54 @@ public partial class MainWindow : Window
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+    #endregion
+
+    #region About Dialog
+
+    private void BtnAbout_Click(object sender, RoutedEventArgs e)
+    {
+        AboutOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void BtnCloseAbout_Click(object sender, RoutedEventArgs e)
+    {
+        AboutOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void AboutOverlay_BackgroundMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        AboutOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void AboutCard_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true; // Prevent click on card from closing dialog
+    }
+
+    private void BtnOpenPlarg_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://plarg.gr") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open website:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void BtnOpenLicense_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://creativecommons.org/licenses/by-nc/4.0/deed.el") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open license:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     #endregion
 

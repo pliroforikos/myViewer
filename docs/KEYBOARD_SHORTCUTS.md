@@ -50,8 +50,9 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | :--- | :--- |
 | **`S`** | Cycle sorting modes: Name Ascending (`A-Z`) → Name Descending (`Z-A`) → Date Modified (`Newest`) → Date Modified (`Oldest`) → File Size (`Largest`) → File Size (`Smallest`) |
 | **`I`** | Toggle collapsible **EXIF & Metadata Sidebar** |
+| **`F1`** | Open / Close **About (Περί)** dialog with creator info & license |
 | **`F11`** | Toggle borderless **Fullscreen** mode |
-| **`Esc`** | Dismiss EXIF sidebar, or exit Fullscreen |
+| **`Esc`** | Dismiss About dialog, EXIF sidebar, or exit Fullscreen |
 
 ---
 

@@ -75,6 +75,28 @@
 
                 <!-- Right: Sort Pill & Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- About / Περί Button -->
+                    <Button x:Name="BtnAbout"
+                            Click="BtnAbout_Click"
+                            Background="#1F1F2B"
+                            BorderBrush="#333345"
+                            BorderThickness="1"
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            Cursor="Hand"
+                            Padding="10,3"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            ToolTip="Περί myView (F1)">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="12" />
+                            </Style>
+                        </Button.Resources>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ℹ Περί" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
                     <!-- Sort Mode Button -->
                     <Button x:Name="BtnSortMode"
                             Click="BtnSort_Click"
@@ -496,5 +518,136 @@
             </StackPanel>
         </Border>
         </Grid>
+
+        <!-- About / Περί Modal Overlay (Spans entire window) -->
+        <Border x:Name="AboutOverlay"
+                Grid.Row="0" Grid.RowSpan="2"
+                Background="#CC050508"
+                Visibility="Collapsed"
+                MouseDown="AboutOverlay_BackgroundMouseDown">
+            <Border Background="#161622"
+                    BorderBrush="#2C2C40"
+                    BorderThickness="1.5"
+                    CornerRadius="20"
+                    MaxWidth="540"
+                    Margin="24"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MouseDown="AboutCard_MouseDown">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="35" ShadowDepth="8" Direction="270" Color="#000000" Opacity="0.75" />
+                </Border.Effect>
+
+                <StackPanel>
+                    <!-- Header -->
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="12" Background="#20202E" BorderBrush="#35354A" BorderThickness="1" Margin="0,0,12,0">
+                            <Image Source="app_icon_256.png" Width="34" Height="34" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
+                                <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
+                                    <TextBlock Text="v1.0.1" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <Button Grid.Column="2" Style="{StaticResource HudIconButton}" Width="32" Height="32" Click="BtnCloseAbout_Click" ToolTip="Κλείσιμο (Esc)">
+                            <Path Data="{StaticResource IconClose}" Fill="{StaticResource TextSecondaryBrush}" Width="12" Height="12" Stretch="Uniform" />
+                        </Button>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#262636" Margin="0,0,0,16" />
+
+                    <!-- Creator Profile Card -->
+                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Avatar from plarg.gr -->
+                            <Border Grid.Column="0" Width="84" Height="84" CornerRadius="42" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2" Margin="0,0,16,0" VerticalAlignment="Center" ClipToBounds="True">
+                                <Image Source="avatar.jpg" Stretch="UniformToFill" Width="84" Height="84" />
+                            </Border>
+
+                            <!-- Info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Λέων Προκόπης" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,2" />
+                                <TextBlock Text="Καθηγητής Πληροφορικής" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,6" />
+                                <TextBlock Text="Εφαρμογές, εργαλεία και σημειώσεις πληροφορικής για τη διδασκαλία και την καθημερινότητα."
+                                           FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                                <Button Click="BtnOpenPlarg_Click"
+                                        Background="#262638"
+                                        Foreground="{StaticResource AccentBrush}"
+                                        BorderBrush="#383850"
+                                        BorderThickness="1"
+                                        Padding="10,4"
+                                        Cursor="Hand"
+                                        HorizontalAlignment="Left">
+                                    <Button.Resources>
+                                        <Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style>
+                                    </Button.Resources>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="🌐 plarg.gr" FontSize="11.5" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- License Card (CC BY-NC 4.0) -->
+                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,16">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <TextBlock Text="⚖️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Άδεια Χρήσης: CC BY-NC 4.0" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <TextBlock Text="Δωρεάν χρήση και διανομή για εκπαιδευτικούς σκοπούς, με αναφορά στον δημιουργό (Λέων Προκόπης) και χωρίς εμπορική χρήση."
+                                       FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="17" Margin="0,0,0,8" />
+
+                            <Button Click="BtnOpenLicense_Click"
+                                    Background="Transparent"
+                                    Foreground="#60A5FA"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    HorizontalAlignment="Left"
+                                    Padding="0">
+                                <TextBlock Text="Creative Commons Attribution-NonCommercial 4.0 International ↗" FontSize="11" TextDecorations="Underline" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Close Button -->
+                    <Button Click="BtnCloseAbout_Click"
+                            Padding="24,9"
+                            Background="{StaticResource AccentBrush}"
+                            Foreground="#000000"
+                            FontWeight="Bold"
+                            FontSize="13"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            HorizontalAlignment="Right">
+                        <Button.Resources>
+                            <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                        </Button.Resources>
+                        <TextBlock Text="Κλείσιμο" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </Window>

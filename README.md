@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 10" />
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows" />
   <img src="https://img.shields.io/badge/Speed-%3C5ms%20Decoding-10B981?style=flat-square" alt="Decode Speed" />
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0-orange?style=flat-square" alt="CC BY-NC 4.0 License" />
   <br><br>
   <b>myView</b> - Σχεδιασμένο για αστραπιαία ταχύτητα, ελάχιστη κατανάλωση πόρων και υποστήριξη επαγγελματικών format.
 </p>
@@ -19,7 +19,7 @@
 - 🏗️ **[Αρχιτεκτονική & Pipeline (Architecture)](docs/ARCHITECTURE.md)**: Ανάλυση του υβριδικού συστήματος αποκωδικοποίησης (WIC, LibRaw, SharpVectors), LRU cache και μαθηματικών zoom.
 - 🎨 **[Υποστηριζόμενα Formats (Supported Formats)](docs/SUPPORTED_FORMATS.md)**: Πλήρης λίστα όλων των υποστηριζόμενων camera RAW, raster, Photoshop και διανυσματικών αρχείων.
 - ⌨️ **[Συντομεύσεις Πληκτρολογίου & Ποντικιού (Shortcuts)](docs/KEYBOARD_SHORTCUTS.md)**: Πλήρης οδηγός χειρισμού και gestures.
-- 📄 **[Άδεια Χρήσης (License)](LICENSE)**: MIT License.
+- 📄 **[Άδεια Χρήσης (License)](LICENSE)**: Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0).
 
 ---
 
@@ -86,10 +86,32 @@
 | **`H`** | Οριζόντια αναστροφή (Flip Horizontal) |
 | **`S`** | Αλλαγή σειράς ταξινόμησης (Cycle Sort Mode) |
 | **`I`** | Άνοιγμα / Κλείσιμο πάνελ EXIF (Toggle EXIF Sidebar) |
+| **`F1`** | Άνοιγμα / Κλείσιμο παραθύρου Περί (About Dialog) |
 | **`F11`** | Πλήρης οθόνη (Toggle Fullscreen) |
 | **`Ctrl + O` / `O`** | Άνοιγμα αρχείου εικόνας (Open File) |
 | **`Delete`** | Διαγραφή τρέχουσας εικόνας (με επιβεβαίωση) |
-| **`Esc`** | Κλείσιμο πάνελ EXIF ή έξοδος από Fullscreen |
+| **`Esc`** | Κλείσιμο διαλόγου Περί, πάνελ EXIF ή έξοδος από Fullscreen |
+
+---
+
+## 👨‍🏫 Περί & Δημιουργός (About & Creator)
+
+<p align="center">
+  <img src="avatar.jpg" width="100" height="100" style="border-radius: 50%;" alt="Λέων Προκόπης" />
+  <br>
+  <b>Λέων Προκόπης</b> (Καθηγητής Πληροφορικής)
+  <br>
+  🌐 <a href="https://plarg.gr"><b>plarg.gr</b></a> — Εφαρμογές, εργαλεία &amp; σημειώσεις πληροφορικής
+</p>
+
+### ⚖️ Άδεια Χρήσης (License)
+
+Το **myView** διατίθεται υπό την άδεια:  
+**[Creative Commons Αναφορά Δημιουργού - Μη Εμπορική Χρήση 4.0 Διεθνές (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.el)**
+
+> **Δωρεάν χρήση και διανομή για εκπαιδευτικούς σκοπούς, με αναφορά στον δημιουργό (Λέων Προκόπης) και χωρίς εμπορική χρήση.**
+>
+> Είστε ελεύθεροι να μοιραστείτε, να αντιγράψετε και να τροποποιήσετε το έργο υπό τον όρο της αναφοράς του δημιουργού ([plarg.gr](https://plarg.gr)) και αποκλειστικά για μη εμπορικούς σκοπούς.
 
 ---
 
