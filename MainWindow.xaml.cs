@@ -570,6 +570,21 @@ public partial class MainWindow : Window
         // Don't capture shortcuts if typing in search box
         if (TxtTagSearch.IsFocused) return;
 
+        // Clipboard Copy shortcuts (Ctrl+C for Image, Ctrl+Shift+C for File Path)
+        if (e.Key == Key.C && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                CopyFilePathToClipboard();
+            }
+            else
+            {
+                CopyImageToClipboard();
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (_isCropMode)
         {
             if (e.Key == Key.Escape || e.Key == Key.C)
@@ -910,6 +925,194 @@ public partial class MainWindow : Window
             // Ignore clipboard errors
         }
     }
+
+    #region Clipboard Operations
+
+    private void BtnCopyImage_Click(object sender, RoutedEventArgs e)
+    {
+        CopyImageToClipboard();
+    }
+
+    private void MenuCopyFilePath_Click(object sender, RoutedEventArgs e)
+    {
+        CopyFilePathToClipboard();
+    }
+
+    private void CopyFilePathToClipboard()
+    {
+        string? path = _folderNav.CurrentItem?.FilePath;
+        if (!string.IsNullOrEmpty(path))
+        {
+            try
+            {
+                Clipboard.SetText(path);
+                ShowToast("✓ Η διαδρομή αρχείου αντιγράφηκε!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Αποτυχία αντιγραφής:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
+    private void CopyImageToClipboard()
+    {
+        if (_currentData == null) return;
+
+        try
+        {
+            BitmapSource? bmpToCopy = null;
+            bool isPartialOrModified = false;
+
+            // 1. If in Crop mode, copy only the cropped region
+            if (_isCropMode)
+            {
+                GetOrientedDimensions(out double iw, out double ih);
+                int cx = (int)Math.Round(_cropPixelRect.X);
+                int cy = (int)Math.Round(_cropPixelRect.Y);
+                int cw = (int)Math.Round(_cropPixelRect.Width);
+                int ch = (int)Math.Round(_cropPixelRect.Height);
+
+                cx = Math.Clamp(cx, 0, (int)iw);
+                cy = Math.Clamp(cy, 0, (int)ih);
+                cw = Math.Clamp(cw, 1, Math.Max(1, (int)iw - cx));
+                ch = Math.Clamp(ch, 1, Math.Max(1, (int)ih - cy));
+
+                var baseBmp = GetCurrentOrientedBitmap();
+                if (baseBmp != null)
+                {
+                    bmpToCopy = new CroppedBitmap(baseBmp, new Int32Rect(cx, cy, cw, ch));
+                    isPartialOrModified = true;
+                }
+            }
+            // 2. If in Perspective mode with warped preview
+            else if (_isPerspectiveMode && DisplayImage.Source is BitmapSource perspBmp)
+            {
+                bmpToCopy = perspBmp;
+                isPartialOrModified = true;
+            }
+            // 3. Regular view (full image with current rotation/flip)
+            else
+            {
+                bmpToCopy = GetCurrentOrientedBitmap();
+                if (_rotation != 0 || _flipH)
+                {
+                    isPartialOrModified = true;
+                }
+            }
+
+            if (bmpToCopy == null) return;
+
+            // Ensure bitmap is frozen for cross-thread / OLE stability
+            if (!bmpToCopy.IsFrozen && bmpToCopy.CanFreeze)
+            {
+                bmpToCopy.Freeze();
+            }
+
+            var dataObject = new DataObject();
+
+            // Set standard Bitmap and DIB formats (compatible with Word, Paint, PowerPoint, Photoshop)
+            dataObject.SetImage(bmpToCopy);
+
+            // Add PNG stream format for transparency preservation in modern apps (Discord, Teams, Word, browsers)
+            try
+            {
+                var pngStream = new MemoryStream();
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bmpToCopy));
+                encoder.Save(pngStream);
+                pngStream.Position = 0;
+                dataObject.SetData("PNG", pngStream, false);
+            }
+            catch { }
+
+            // Add FileDrop format if the original file matches without transformations (for pasting file in Explorer)
+            string? filePath = _folderNav.CurrentItem?.FilePath;
+            if (!isPartialOrModified && !string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                var files = new System.Collections.Specialized.StringCollection { filePath };
+                dataObject.SetFileDropList(files);
+            }
+
+            // Set to clipboard with retry for transient clipboard locks
+            bool copied = false;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    Clipboard.SetDataObject(dataObject, true);
+                    copied = true;
+                    break;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    Thread.Sleep(30);
+                }
+            }
+
+            if (copied)
+            {
+                string msg = _isCropMode
+                    ? "✓ Το επιλεγμένο τμήμα αντιγράφηκε στο Clipboard!"
+                    : "✓ Η εικόνα αντιγράφηκε στο Clipboard!";
+                ShowToast(msg);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Αποτυχία αντιγραφής στο Πρόχειρο:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private BitmapSource? GetCurrentOrientedBitmap()
+    {
+        if (_currentData == null) return null;
+
+        BitmapSource? baseBmp = null;
+
+        if (_currentData.ImageSource is BitmapSource bs)
+        {
+            baseBmp = bs;
+        }
+        else if (_currentData.ImageSource != null)
+        {
+            // Vector (SVG) or DrawingImage: render to RenderTargetBitmap
+            int w = Math.Max(1, _currentData.PixelWidth);
+            int h = Math.Max(1, _currentData.PixelHeight);
+            var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawImage(_currentData.ImageSource, new Rect(0, 0, w, h));
+            }
+            rtb.Render(dv);
+            rtb.Freeze();
+            baseBmp = rtb;
+        }
+
+        if (baseBmp == null) return null;
+
+        if (_rotation != 0 || _flipH)
+        {
+            var transformGroup = new TransformGroup();
+            if (_flipH)
+            {
+                transformGroup.Children.Add(new ScaleTransform(-1, 1, baseBmp.PixelWidth / 2.0, baseBmp.PixelHeight / 2.0));
+            }
+            if (_rotation != 0)
+            {
+                transformGroup.Children.Add(new RotateTransform(_rotation, baseBmp.PixelWidth / 2.0, baseBmp.PixelHeight / 2.0));
+            }
+
+            var transformed = new TransformedBitmap(baseBmp, transformGroup);
+            transformed.Freeze();
+            return transformed;
+        }
+
+        return baseBmp;
+    }
+
+    #endregion
 
     private void BtnOpenMap_Click(object sender, RoutedEventArgs e)
     {

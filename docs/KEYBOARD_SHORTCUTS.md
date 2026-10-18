@@ -68,10 +68,13 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 
 ---
 
-## 📁 File Operations
+## 📋 Πρόχειρο & Αρχεία (Clipboard & Files)
 
 | Shortcut | Description |
 | :--- | :--- |
+| **`Ctrl + C`** | **Αντιγραφή Εικόνας στο Πρόχειρο (Copy Image to Clipboard)** για άμεση επικόλληση (`Ctrl+V`) σε Word, PowerPoint, Paint, Photoshop, Teams, Discord, Browsers κ.λπ. Σε λειτουργία Crop (`C`) αντιγράφει μόνο το επιλεγμένο τμήμα! |
+| **`Ctrl + Shift + C`** | **Αντιγραφή Διαδρομής Αρχείου (Copy File Path)** στο Clipboard |
+| **`Right-Click`** | Άνοιγμα **Μενού Επιλογών (Context Menu)** με όλες τις βασικές λειτουργίες |
 | **`Ctrl + O` / `O`** | Open File dialog |
 | **`Delete`** | Delete currently active image file (with confirmation dialog) |
 | **`Drag & Drop`** | Drag any image file or directory from Windows Explorer directly onto the app |

@@ -149,6 +149,23 @@
                     MouseMove="Viewport_MouseMove"
                     MouseUp="Viewport_MouseUp"
                     MouseWheel="Viewport_MouseWheel">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="📋 Αντιγραφή Εικόνας" InputGestureText="Ctrl+C" Click="BtnCopyImage_Click" />
+                        <MenuItem Header="📁 Αντιγραφή Διαδρομής Αρχείου" InputGestureText="Ctrl+Shift+C" Click="MenuCopyFilePath_Click" />
+                        <Separator />
+                        <MenuItem Header="✂️ Περικοπή (Crop)" InputGestureText="C" Click="BtnCrop_Click" />
+                        <MenuItem Header="📐 Ίσιωμα Ορίζοντα" InputGestureText="E" Click="BtnHorizon_Click" />
+                        <MenuItem Header="📐 Προοπτική &amp; Skew" InputGestureText="P" Click="BtnPerspective_Click" />
+                        <Separator />
+                        <MenuItem Header="🔄 Περιστροφή Δεξιά 90°" InputGestureText="R" Click="BtnRotateRight_Click" />
+                        <MenuItem Header="🔄 Περιστροφή Αριστερά 90°" InputGestureText="L" Click="BtnRotateLeft_Click" />
+                        <MenuItem Header="↔️ Οριζόντια Αναστροφή" InputGestureText="H" Click="BtnFlipH_Click" />
+                        <Separator />
+                        <MenuItem Header="ℹ️ Πληροφορίες EXIF" InputGestureText="I" Click="BtnExif_Click" />
+                        <MenuItem Header="⚙️ Περί &amp; Προεπιλογές" InputGestureText="F1" Click="BtnAbout_Click" />
+                    </ContextMenu>
+                </Border.ContextMenu>
                 <Canvas x:Name="ImageCanvas" ClipToBounds="False">
                     <Image x:Name="DisplayImage"
                            RenderOptions.BitmapScalingMode="HighQuality"
@@ -275,6 +292,11 @@
                 </Button>
                 <Button Style="{StaticResource HudIconButton}" Click="BtnFlipH_Click" ToolTip="Flip Horizontal (H)">
                     <Path Data="{StaticResource IconFlipH}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
+                </Button>
+
+                <!-- Copy Image to Clipboard -->
+                <Button x:Name="BtnCopyImage" Style="{StaticResource HudIconButton}" Click="BtnCopyImage_Click" ToolTip="Αντιγραφή Εικόνας στο Πρόχειρο (Ctrl+C)">
+                    <Path Data="{StaticResource IconCopy}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
 
                 <!-- Crop Mode Toggle -->
@@ -1004,7 +1026,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.5" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.6" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />

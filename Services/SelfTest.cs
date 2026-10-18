@@ -309,10 +309,44 @@ public static class SelfTest
             allPassed = false;
         }
 
+        // 11. Test Clipboard Image Copy
+        try
+        {
+            string pngSample = Path.Combine(sampleDir, "test1_shapes.png");
+            var imgData = await ImageLoader.LoadImageAsync(pngSample);
+            Assert(imgData.ImageSource is System.Windows.Media.Imaging.BitmapSource, "Image is BitmapSource");
+
+            var bs = (System.Windows.Media.Imaging.BitmapSource)imgData.ImageSource;
+            var dataObject = new System.Windows.DataObject();
+            dataObject.SetImage(bs);
+
+            using var ms = new MemoryStream();
+            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bs));
+            enc.Save(ms);
+            ms.Position = 0;
+            dataObject.SetData("PNG", ms, false);
+
+            var files = new System.Collections.Specialized.StringCollection { pngSample };
+            dataObject.SetFileDropList(files);
+
+            System.Windows.Clipboard.SetDataObject(dataObject, true);
+
+            bool hasBitmap = System.Windows.Clipboard.ContainsImage();
+            bool hasFileDrop = System.Windows.Clipboard.ContainsFileDropList();
+            Assert(hasBitmap && hasFileDrop, "Clipboard contains Bitmap and FileDrop");
+            Log("  [PASS] Clipboard Copy verified (Bitmap, DIB, PNG stream, FileDrop).");
+        }
+        catch (Exception ex)
+        {
+            Log($"  [FAIL] Clipboard test failed: {ex.Message}");
+            allPassed = false;
+        }
+
         Log("========================================");
         if (allPassed)
         {
-            Log("   >>> ALL 10 TEST SUITES PASSED! <<<   ");
+            Log("   >>> ALL 11 TEST SUITES PASSED! <<<   ");
         }
         else
         {
