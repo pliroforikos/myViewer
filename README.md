@@ -191,10 +191,10 @@
 
 | Αρχείο | Τύπος | Περιγραφή |
 | :--- | :--- | :--- |
-| **`myView-v1.0.8-setup.exe`** | **Windows Setup Installer** *(Προτεινόμενο)* | Πλήρης εγκαταστάτης (Inno Setup) με οδηγό βήμα-προς-βήμα, συντομεύσεις, απεγκατάσταση και αυτόματη δήλωση προεπιλογής. Δεν απαιτείται .NET. |
-| **`myView-v1.0.8-lightweight-setup.exe`** | **Lightweight Setup** (~11 MB) | Ελαφρύς εγκαταστάτης για συστήματα που διαθέτουν ήδη εγκατεστημένο το .NET 10 Runtime. |
-| **`myView-v1.0.8-standalone-win-x64.zip`** | **Portable Zip (Standalone)** | Φορητή έκδοση σε zip — απλώς αποσυμπιέστε και τρέξτε το `myView.exe` χωρίς καμία εγκατάσταση. |
-| **`myView-v1.0.8-windows-x64.zip`** | **Portable Zip (Lightweight)** | Φορητή έκδοση (~13 MB) για χρήστες με .NET 10. |
+| **`myView-v1.0.9-setup.exe`** | **Windows Setup Installer** *(Προτεινόμενο)* | Πλήρης εγκαταστάτης (Inno Setup) με οδηγό βήμα-προς-βήμα, συντομεύσεις, απεγκατάσταση και αυτόματη δήλωση προεπιλογής. Δεν απαιτείται .NET. |
+| **`myView-v1.0.9-lightweight-setup.exe`** | **Lightweight Setup** (~11 MB) | Ελαφρύς εγκαταστάτης για συστήματα που διαθέτουν ήδη εγκατεστημένο το .NET 10 Runtime. |
+| **`myView-v1.0.9-standalone-win-x64.zip`** | **Portable Zip (Standalone)** | Φορητή έκδοση σε zip — απλώς αποσυμπιέστε και τρέξτε το `myView.exe` χωρίς καμία εγκατάσταση. |
+| **`myView-v1.0.9-windows-x64.zip`** | **Portable Zip (Lightweight)** | Φορητή έκδοση (~13 MB) για χρήστες με .NET 10. |
 
 ---
 

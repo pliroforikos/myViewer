@@ -80,7 +80,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _loadCts;
 
     // Auto-update state
-    private const string CurrentAppVersion = "1.0.8";
+    private const string CurrentAppVersion = "1.0.9";
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _downloadCts;
 

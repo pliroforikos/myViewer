@@ -2,7 +2,7 @@
 ; Inno Setup 6 Script - Lightweight Edition (Framework Dependent)
 
 #define MyAppName "myView (Lightweight)"
-#define MyAppVersion "1.0.8"
+#define MyAppVersion "1.0.9"
 #define MyAppPublisher "Λέων Προκόπης (plarg.gr)"
 #define MyAppURL "https://plarg.gr"
 #define MyAppExeName "myView.exe"
@@ -16,16 +16,19 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL=https://github.com/pliroforikos/myViewer/releases
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={autopf}\myView
 DefaultGroupName=myView
 AllowNoIcons=yes
 LicenseFile=..\LICENSE
 OutputDir=..\dist
-OutputBaseFilename=myView-v1.0.8-lightweight-setup
+OutputBaseFilename=myView-v1.0.9-lightweight-setup
 SetupIconFile=..\app.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ChangesAssociations=yes
@@ -43,12 +46,12 @@ Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\myView"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{group}\myView"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Documentation (README)"; Filename: "{app}\README.md"
 Name: "{group}\License (CC BY-NC 4.0)"; Filename: "{app}\LICENSE"
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppPublisher}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,myView}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\myView"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\myView"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
 ; ProgID Definition
@@ -87,4 +90,4 @@ Root: HKA; Subkey: "Software\Classes\.svg\OpenWithProgids"; ValueType: string; V
 Root: HKA; Subkey: "Software\Classes\.psd\OpenWithProgids"; ValueType: string; ValueName: "myView.Image"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associmages
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,myView}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,myView}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"

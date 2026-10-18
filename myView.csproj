@@ -10,8 +10,10 @@
     <AssemblyName>myView</AssemblyName>
     <Title>myView - Ultra-Fast Image Viewer</Title>
     <Product>myView</Product>
-    <Version>1.0.8</Version>
+    <Version>1.0.9</Version>
     <Company>myView</Company>
+    <PlatformTarget>x64</PlatformTarget>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
