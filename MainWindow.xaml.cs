@@ -42,6 +42,16 @@ public partial class MainWindow : Window
     private WindowState _previousWindowState = WindowState.Normal;
     private WindowStyle _previousWindowStyle = WindowStyle.SingleBorderWindow;
 
+    // Crop state
+    private bool _isCropMode = false;
+    private Rect _cropPixelRect = Rect.Empty;
+    private Rect _cropRectScreen = Rect.Empty;
+    private enum CropDragMode { None, Creating, Moving, ResizeNW, ResizeNE, ResizeSW, ResizeSE, ResizeN, ResizeS, ResizeW, ResizeE }
+    private CropDragMode _cropDragMode = CropDragMode.None;
+    private Point _cropDragStartPoint;
+    private Rect _cropRectStart;
+    private readonly DispatcherTimer _toastTimer = new();
+
     // CancellationToken for current decode
     private CancellationTokenSource? _loadCts;
 
@@ -61,6 +71,13 @@ public partial class MainWindow : Window
             }
         };
         _hudTimer.Start();
+
+        _toastTimer.Interval = TimeSpan.FromSeconds(3.0);
+        _toastTimer.Tick += (s, e) =>
+        {
+            _toastTimer.Stop();
+            ToastBadge.Visibility = Visibility.Collapsed;
+        };
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -197,6 +214,11 @@ public partial class MainWindow : Window
 
     private void ApplyLoadedImage(LoadedImageData data)
     {
+        if (_isCropMode)
+        {
+            ExitCropMode();
+        }
+
         _currentData = data;
         DisplayImage.Source = data.ImageSource;
         DisplayImage.Width = data.PixelWidth;
@@ -392,6 +414,11 @@ public partial class MainWindow : Window
         ImageMatrixTransform.Matrix = matrix;
 
         TxtZoomLevel.Text = $"{Math.Round(_scale * 100)}%";
+
+        if (_isCropMode)
+        {
+            UpdateCropScreenFromPixels();
+        }
     }
 
     private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -463,6 +490,10 @@ public partial class MainWindow : Window
         {
             FitToScreen();
         }
+        else if (_isCropMode)
+        {
+            UpdateCropScreenFromPixels();
+        }
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -470,6 +501,10 @@ public partial class MainWindow : Window
         if (_isFitMode)
         {
             FitToScreen();
+        }
+        else if (_isCropMode)
+        {
+            UpdateCropScreenFromPixels();
         }
     }
 
@@ -481,6 +516,21 @@ public partial class MainWindow : Window
     {
         // Don't capture shortcuts if typing in search box
         if (TxtTagSearch.IsFocused) return;
+
+        if (_isCropMode)
+        {
+            if (e.Key == Key.Escape || e.Key == Key.C)
+            {
+                ExitCropMode();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                BtnCropSaveAs_Click(sender, e);
+                e.Handled = true;
+            }
+            return;
+        }
 
         switch (e.Key)
         {
@@ -574,6 +624,11 @@ public partial class MainWindow : Window
             case Key.I:
                 ToggleExifSidebar();
                 RevealHud();
+                e.Handled = true;
+                break;
+
+            case Key.C:
+                ToggleCropMode();
                 e.Handled = true;
                 break;
 
@@ -689,6 +744,8 @@ public partial class MainWindow : Window
         _flipH = !_flipH;
         ApplyTransforms();
     }
+
+    private void BtnCrop_Click(object sender, RoutedEventArgs e) => ToggleCropMode();
 
     private void BtnSort_Click(object sender, RoutedEventArgs e)
     {
@@ -951,6 +1008,474 @@ public partial class MainWindow : Window
         {
             MessageBox.Show($"Could not open license:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    #endregion
+
+    #region Crop & Save Operations
+
+    private void ToggleCropMode()
+    {
+        if (_isCropMode)
+            ExitCropMode();
+        else
+            EnterCropMode();
+    }
+
+    private void EnterCropMode()
+    {
+        if (_currentData == null) return;
+
+        GetOrientedDimensions(out double imgW, out double imgH);
+        if (imgW <= 0 || imgH <= 0) return;
+
+        _isCropMode = true;
+
+        // Hide standard HUD and EXIF
+        BottomHudBar.Visibility = Visibility.Collapsed;
+        ExifSidebar.Visibility = Visibility.Collapsed;
+
+        // Show Crop Canvas & Toolbar
+        CropCanvas.Visibility = Visibility.Visible;
+        CropToolbar.Visibility = Visibility.Visible;
+
+        // Default crop box: 80% centered in image pixels
+        double initW = Math.Round(imgW * 0.8);
+        double initH = Math.Round(imgH * 0.8);
+        double initX = Math.Round((imgW - initW) / 2.0);
+        double initY = Math.Round((imgH - initH) / 2.0);
+
+        _cropPixelRect = new Rect(initX, initY, initW, initH);
+        UpdateCropScreenFromPixels();
+    }
+
+    private void ExitCropMode()
+    {
+        _isCropMode = false;
+        _cropDragMode = CropDragMode.None;
+        CropCanvas.ReleaseMouseCapture();
+        CropCanvas.Visibility = Visibility.Collapsed;
+        CropToolbar.Visibility = Visibility.Collapsed;
+        BottomHudBar.Visibility = Visibility.Visible;
+        RevealHud();
+    }
+
+    private void GetOrientedDimensions(out double w, out double h)
+    {
+        if (_currentData == null)
+        {
+            w = 0;
+            h = 0;
+            return;
+        }
+
+        if (_rotation == 90 || _rotation == 270)
+        {
+            w = _currentData.PixelHeight;
+            h = _currentData.PixelWidth;
+        }
+        else
+        {
+            w = _currentData.PixelWidth;
+            h = _currentData.PixelHeight;
+        }
+    }
+
+    private Point ImageToScreen(Point imgPt)
+    {
+        GetOrientedDimensions(out double w, out double h);
+        double sx = (imgPt.X - w / 2.0) * _scale + _centerX;
+        double sy = (imgPt.Y - h / 2.0) * _scale + _centerY;
+        return new Point(sx, sy);
+    }
+
+    private Point ScreenToImage(Point scrPt)
+    {
+        GetOrientedDimensions(out double w, out double h);
+        double ix = (scrPt.X - _centerX) / _scale + w / 2.0;
+        double iy = (scrPt.Y - _centerY) / _scale + h / 2.0;
+        return new Point(ix, iy);
+    }
+
+    private void UpdateCropScreenFromPixels()
+    {
+        if (!_isCropMode || _currentData == null || _cropPixelRect.IsEmpty)
+            return;
+
+        GetOrientedDimensions(out double imgW, out double imgH);
+
+        double px = Math.Clamp(_cropPixelRect.X, 0, Math.Max(0, imgW - 1));
+        double py = Math.Clamp(_cropPixelRect.Y, 0, Math.Max(0, imgH - 1));
+        double pw = Math.Clamp(_cropPixelRect.Width, 1, imgW - px);
+        double ph = Math.Clamp(_cropPixelRect.Height, 1, imgH - py);
+        _cropPixelRect = new Rect(px, py, pw, ph);
+
+        Point p1 = ImageToScreen(new Point(px, py));
+        Point p2 = ImageToScreen(new Point(px + pw, py + ph));
+
+        double sx = Math.Min(p1.X, p2.X);
+        double sy = Math.Min(p1.Y, p2.Y);
+        double sw = Math.Abs(p2.X - p1.X);
+        double sh = Math.Abs(p2.Y - p1.Y);
+
+        _cropRectScreen = new Rect(sx, sy, sw, sh);
+        UpdateCropUi();
+    }
+
+    private void UpdateCropPixelsFromScreen()
+    {
+        GetOrientedDimensions(out double imgW, out double imgH);
+
+        Point p1 = ScreenToImage(new Point(_cropRectScreen.Left, _cropRectScreen.Top));
+        Point p2 = ScreenToImage(new Point(_cropRectScreen.Right, _cropRectScreen.Bottom));
+
+        double px = Math.Clamp(Math.Round(Math.Min(p1.X, p2.X)), 0, Math.Max(0, imgW - 1));
+        double py = Math.Clamp(Math.Round(Math.Min(p1.Y, p2.Y)), 0, Math.Max(0, imgH - 1));
+        double pw = Math.Clamp(Math.Round(Math.Abs(p2.X - p1.X)), 1, imgW - px);
+        double ph = Math.Clamp(Math.Round(Math.Abs(p2.Y - p1.Y)), 1, imgH - py);
+
+        _cropPixelRect = new Rect(px, py, pw, ph);
+        UpdateCropUi();
+    }
+
+    private void UpdateCropUi()
+    {
+        if (!_isCropMode || _currentData == null) return;
+
+        double viewportW = ViewportBorder.ActualWidth;
+        double viewportH = ViewportBorder.ActualHeight;
+
+        double x = _cropRectScreen.X;
+        double y = _cropRectScreen.Y;
+        double w = Math.Max(1, _cropRectScreen.Width);
+        double h = Math.Max(1, _cropRectScreen.Height);
+
+        // Position CropBox
+        Canvas.SetLeft(CropBox, x);
+        Canvas.SetTop(CropBox, y);
+        CropBox.Width = w;
+        CropBox.Height = h;
+
+        // Position the 4 dark shades
+        Canvas.SetLeft(CropShadeTop, 0);
+        Canvas.SetTop(CropShadeTop, 0);
+        CropShadeTop.Width = viewportW;
+        CropShadeTop.Height = Math.Max(0, y);
+
+        Canvas.SetLeft(CropShadeBottom, 0);
+        Canvas.SetTop(CropShadeBottom, Math.Min(viewportH, y + h));
+        CropShadeBottom.Width = viewportW;
+        CropShadeBottom.Height = Math.Max(0, viewportH - (y + h));
+
+        Canvas.SetLeft(CropShadeLeft, 0);
+        Canvas.SetTop(CropShadeLeft, Math.Max(0, y));
+        CropShadeLeft.Width = Math.Max(0, x);
+        CropShadeLeft.Height = h;
+
+        Canvas.SetLeft(CropShadeRight, Math.Min(viewportW, x + w));
+        Canvas.SetTop(CropShadeRight, Math.Max(0, y));
+        CropShadeRight.Width = Math.Max(0, viewportW - (x + w));
+        CropShadeRight.Height = h;
+
+        // Position 8 Handles
+        double cx = x + w / 2.0;
+        double cy = y + h / 2.0;
+
+        Canvas.SetLeft(HandleNW, x - 5); Canvas.SetTop(HandleNW, y - 5);
+        Canvas.SetLeft(HandleNE, x + w - 5); Canvas.SetTop(HandleNE, y - 5);
+        Canvas.SetLeft(HandleSW, x - 5); Canvas.SetTop(HandleSW, y + h - 5);
+        Canvas.SetLeft(HandleSE, x + w - 5); Canvas.SetTop(HandleSE, y + h - 5);
+
+        Canvas.SetLeft(HandleN, cx - 5); Canvas.SetTop(HandleN, y - 5);
+        Canvas.SetLeft(HandleS, cx - 5); Canvas.SetTop(HandleS, y + h - 5);
+        Canvas.SetLeft(HandleW, x - 5); Canvas.SetTop(HandleW, cy - 5);
+        Canvas.SetLeft(HandleE, x + w - 5); Canvas.SetTop(HandleE, cy - 5);
+
+        // Update dimensions text
+        TxtCropDimensions.Text = $"{(int)_cropPixelRect.Width} × {(int)_cropPixelRect.Height} px";
+    }
+
+    private CropDragMode GetCropHitTestMode(Point pt)
+    {
+        if (_cropRectScreen.IsEmpty) return CropDragMode.None;
+
+        double x = _cropRectScreen.X;
+        double y = _cropRectScreen.Y;
+        double w = _cropRectScreen.Width;
+        double h = _cropRectScreen.Height;
+        double tol = 9.0;
+
+        bool nearLeft = Math.Abs(pt.X - x) <= tol;
+        bool nearRight = Math.Abs(pt.X - (x + w)) <= tol;
+        bool nearTop = Math.Abs(pt.Y - y) <= tol;
+        bool nearBottom = Math.Abs(pt.Y - (y + h)) <= tol;
+        bool insideX = pt.X >= x - tol && pt.X <= x + w + tol;
+        bool insideY = pt.Y >= y - tol && pt.Y <= y + h + tol;
+
+        if (nearLeft && nearTop) return CropDragMode.ResizeNW;
+        if (nearRight && nearTop) return CropDragMode.ResizeNE;
+        if (nearLeft && nearBottom) return CropDragMode.ResizeSW;
+        if (nearRight && nearBottom) return CropDragMode.ResizeSE;
+        if (nearTop && insideX) return CropDragMode.ResizeN;
+        if (nearBottom && insideX) return CropDragMode.ResizeS;
+        if (nearLeft && insideY) return CropDragMode.ResizeW;
+        if (nearRight && insideY) return CropDragMode.ResizeE;
+
+        if (_cropRectScreen.Contains(pt)) return CropDragMode.Moving;
+
+        return CropDragMode.None;
+    }
+
+    private void CropCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+
+        Point pt = e.GetPosition(CropCanvas);
+        _cropDragStartPoint = pt;
+        _cropRectStart = _cropRectScreen;
+
+        _cropDragMode = GetCropHitTestMode(pt);
+        if (_cropDragMode == CropDragMode.None)
+        {
+            _cropDragMode = CropDragMode.Creating;
+            _cropRectScreen = new Rect(pt.X, pt.Y, 1, 1);
+            UpdateCropPixelsFromScreen();
+        }
+
+        CropCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void CropCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        Point pt = e.GetPosition(CropCanvas);
+
+        if (_cropDragMode == CropDragMode.None)
+        {
+            var mode = GetCropHitTestMode(pt);
+            CropCanvas.Cursor = mode switch
+            {
+                CropDragMode.ResizeNW => Cursors.SizeNWSE,
+                CropDragMode.ResizeSE => Cursors.SizeNWSE,
+                CropDragMode.ResizeNE => Cursors.SizeNESW,
+                CropDragMode.ResizeSW => Cursors.SizeNESW,
+                CropDragMode.ResizeN => Cursors.SizeNS,
+                CropDragMode.ResizeS => Cursors.SizeNS,
+                CropDragMode.ResizeW => Cursors.SizeWE,
+                CropDragMode.ResizeE => Cursors.SizeWE,
+                CropDragMode.Moving => Cursors.SizeAll,
+                _ => Cursors.Cross
+            };
+            return;
+        }
+
+        double deltaX = pt.X - _cropDragStartPoint.X;
+        double deltaY = pt.Y - _cropDragStartPoint.Y;
+
+        GetOrientedDimensions(out double imgW, out double imgH);
+        Point scrTopLeft = ImageToScreen(new Point(0, 0));
+        Point scrBottomRight = ImageToScreen(new Point(imgW, imgH));
+        double minScrX = Math.Min(scrTopLeft.X, scrBottomRight.X);
+        double maxScrX = Math.Max(scrTopLeft.X, scrBottomRight.X);
+        double minScrY = Math.Min(scrTopLeft.Y, scrBottomRight.Y);
+        double maxScrY = Math.Max(scrTopLeft.Y, scrBottomRight.Y);
+
+        Rect newRect = _cropRectStart;
+
+        switch (_cropDragMode)
+        {
+            case CropDragMode.Creating:
+                double x1 = Math.Clamp(Math.Min(_cropDragStartPoint.X, pt.X), minScrX, maxScrX);
+                double y1 = Math.Clamp(Math.Min(_cropDragStartPoint.Y, pt.Y), minScrY, maxScrY);
+                double x2 = Math.Clamp(Math.Max(_cropDragStartPoint.X, pt.X), minScrX, maxScrX);
+                double y2 = Math.Clamp(Math.Max(_cropDragStartPoint.Y, pt.Y), minScrY, maxScrY);
+                newRect = new Rect(x1, y1, Math.Max(4, x2 - x1), Math.Max(4, y2 - y1));
+                break;
+
+            case CropDragMode.Moving:
+                double nx = Math.Clamp(_cropRectStart.X + deltaX, minScrX, Math.Max(minScrX, maxScrX - _cropRectStart.Width));
+                double ny = Math.Clamp(_cropRectStart.Y + deltaY, minScrY, Math.Max(minScrY, maxScrY - _cropRectStart.Height));
+                newRect = new Rect(nx, ny, _cropRectStart.Width, _cropRectStart.Height);
+                break;
+
+            case CropDragMode.ResizeNW:
+                double rxNW = Math.Clamp(_cropRectStart.X + deltaX, minScrX, _cropRectStart.Right - 8);
+                double ryNW = Math.Clamp(_cropRectStart.Y + deltaY, minScrY, _cropRectStart.Bottom - 8);
+                newRect = new Rect(rxNW, ryNW, _cropRectStart.Right - rxNW, _cropRectStart.Bottom - ryNW);
+                break;
+
+            case CropDragMode.ResizeNE:
+                double rxNE = Math.Clamp(_cropRectStart.Right + deltaX, _cropRectStart.Left + 8, maxScrX);
+                double ryNE = Math.Clamp(_cropRectStart.Y + deltaY, minScrY, _cropRectStart.Bottom - 8);
+                newRect = new Rect(_cropRectStart.Left, ryNE, rxNE - _cropRectStart.Left, _cropRectStart.Bottom - ryNE);
+                break;
+
+            case CropDragMode.ResizeSW:
+                double rxSW = Math.Clamp(_cropRectStart.X + deltaX, minScrX, _cropRectStart.Right - 8);
+                double rySW = Math.Clamp(_cropRectStart.Bottom + deltaY, _cropRectStart.Top + 8, maxScrY);
+                newRect = new Rect(rxSW, _cropRectStart.Top, _cropRectStart.Right - rxSW, rySW - _cropRectStart.Top);
+                break;
+
+            case CropDragMode.ResizeSE:
+                double rxSE = Math.Clamp(_cropRectStart.Right + deltaX, _cropRectStart.Left + 8, maxScrX);
+                double rySE = Math.Clamp(_cropRectStart.Bottom + deltaY, _cropRectStart.Top + 8, maxScrY);
+                newRect = new Rect(_cropRectStart.Left, _cropRectStart.Top, rxSE - _cropRectStart.Left, rySE - _cropRectStart.Top);
+                break;
+
+            case CropDragMode.ResizeN:
+                double ryN = Math.Clamp(_cropRectStart.Y + deltaY, minScrY, _cropRectStart.Bottom - 8);
+                newRect = new Rect(_cropRectStart.Left, ryN, _cropRectStart.Width, _cropRectStart.Bottom - ryN);
+                break;
+
+            case CropDragMode.ResizeS:
+                double ryS = Math.Clamp(_cropRectStart.Bottom + deltaY, _cropRectStart.Top + 8, maxScrY);
+                newRect = new Rect(_cropRectStart.Left, _cropRectStart.Top, _cropRectStart.Width, ryS - _cropRectStart.Top);
+                break;
+
+            case CropDragMode.ResizeW:
+                double rxW = Math.Clamp(_cropRectStart.X + deltaX, minScrX, _cropRectStart.Right - 8);
+                newRect = new Rect(rxW, _cropRectStart.Top, _cropRectStart.Right - rxW, _cropRectStart.Height);
+                break;
+
+            case CropDragMode.ResizeE:
+                double rxE = Math.Clamp(_cropRectStart.Right + deltaX, _cropRectStart.Left + 8, maxScrX);
+                newRect = new Rect(_cropRectStart.Left, _cropRectStart.Top, rxE - _cropRectStart.Left, _cropRectStart.Height);
+                break;
+        }
+
+        _cropRectScreen = newRect;
+        UpdateCropPixelsFromScreen();
+    }
+
+    private void CropCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_cropDragMode != CropDragMode.None)
+        {
+            _cropDragMode = CropDragMode.None;
+            CropCanvas.ReleaseMouseCapture();
+        }
+    }
+
+    private async void BtnCropSaveAs_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null || _cropPixelRect.IsEmpty) return;
+
+        string currentPath = item.FilePath;
+        string dir = Path.GetDirectoryName(currentPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        string baseName = Path.GetFileNameWithoutExtension(currentPath);
+        string currentExt = Path.GetExtension(currentPath).ToLowerInvariant();
+
+        var sfd = new SaveFileDialog
+        {
+            Title = "Αποθήκευση Περικομμένης Εικόνας (Save Cropped Image)",
+            InitialDirectory = dir,
+            FileName = $"{baseName}_crop{currentExt}",
+            Filter = "JPEG Image (*.jpg;*.jpeg)|*.jpg;*.jpeg|" +
+                     "PNG Image (*.png)|*.png|" +
+                     "WebP Image (*.webp)|*.webp|" +
+                     "GIF Image (*.gif)|*.gif|" +
+                     "Bitmap Image (*.bmp)|*.bmp|" +
+                     "All Files (*.*)|*.*"
+        };
+
+        sfd.FilterIndex = currentExt switch
+        {
+            ".png" => 2,
+            ".webp" => 3,
+            ".gif" => 4,
+            ".bmp" => 5,
+            _ => 1
+        };
+
+        if (sfd.ShowDialog(this) == true)
+        {
+            string destPath = sfd.FileName;
+            var rect = new Int32Rect((int)_cropPixelRect.X, (int)_cropPixelRect.Y, (int)_cropPixelRect.Width, (int)_cropPixelRect.Height);
+
+            try
+            {
+                LoadingBadge.Visibility = Visibility.Visible;
+                await ImageCropService.CropAndSaveAsync(currentPath, destPath, rect, _rotation, _flipH);
+                ExitCropMode();
+
+                string destDir = Path.GetDirectoryName(destPath) ?? "";
+                if (string.Equals(dir, destDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    _folderNav.LoadFolder(destDir, destPath);
+                }
+                else
+                {
+                    OpenSpecificFile(destPath);
+                }
+
+                ShowToast($"✓ Αποθηκεύτηκε: {Path.GetFileName(destPath)}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Σφάλμα κατά την αποθήκευση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async void BtnCropOverwrite_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null || _cropPixelRect.IsEmpty) return;
+
+        string currentPath = item.FilePath;
+        string fileName = Path.GetFileName(currentPath);
+
+        var result = MessageBox.Show(
+            $"Είστε βέβαιοι ότι θέλετε να αντικαταστήσετε το αρχικό αρχείο;\n\n{fileName}\n\nΗ ενέργεια αυτή θα αποθηκεύσει την περικομμένη εικόνα πάνω στο αρχικό αρχείο.",
+            "Επιβεβαίωση Αντικατάστασης - myView",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        var rect = new Int32Rect((int)_cropPixelRect.X, (int)_cropPixelRect.Y, (int)_cropPixelRect.Width, (int)_cropPixelRect.Height);
+
+        try
+        {
+            LoadingBadge.Visibility = Visibility.Visible;
+            await ImageCropService.CropAndSaveAsync(currentPath, currentPath, rect, _rotation, _flipH);
+
+            _cache.Remove(currentPath);
+
+            _rotation = 0;
+            _flipH = false;
+
+            ExitCropMode();
+
+            await DisplayImageItemAsync(item);
+            ShowToast("✓ Το αρχείο αντικαταστάθηκε επιτυχώς!");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Σφάλμα κατά την αντικατάσταση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            LoadingBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void BtnCropCancel_Click(object sender, RoutedEventArgs e)
+    {
+        ExitCropMode();
+    }
+
+    private void ShowToast(string message)
+    {
+        TxtToastMessage.Text = message;
+        ToastBadge.Visibility = Visibility.Visible;
+        _toastTimer.Stop();
+        _toastTimer.Start();
     }
 
     #endregion

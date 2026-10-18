@@ -57,6 +57,15 @@ public class ImageCacheService
         }
     }
 
+    public void Remove(string filePath)
+    {
+        lock (_lock)
+        {
+            _cache.TryRemove(filePath, out _);
+            _lruList.Remove(filePath);
+        }
+    }
+
     public void Prefetch(IEnumerable<string> filePaths)
     {
         _prefetchCts?.Cancel();

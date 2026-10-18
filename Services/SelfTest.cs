@@ -159,10 +159,42 @@ public static class SelfTest
             allPassed = false;
         }
 
+        // 9. Test Cropping & Saving (JPG -> WebP, PNG, JPG)
+        try
+        {
+            string jpgSrc = Path.Combine(sampleDir, "test3_landscape.jpg");
+            string cropJpgOut = Path.Combine(sampleDir, "test_crop_out.jpg");
+            string cropWebpOut = Path.Combine(sampleDir, "test_crop_out.webp");
+            string cropPngOut = Path.Combine(sampleDir, "test_crop_out.png");
+
+            var cropRect = new System.Windows.Int32Rect(100, 100, 400, 300);
+            await ImageCropService.CropAndSaveAsync(jpgSrc, cropJpgOut, cropRect);
+            await ImageCropService.CropAndSaveAsync(jpgSrc, cropWebpOut, cropRect);
+            await ImageCropService.CropAndSaveAsync(jpgSrc, cropPngOut, cropRect);
+
+            var loadedJpgCrop = await ImageLoader.LoadImageAsync(cropJpgOut);
+            var loadedWebpCrop = await ImageLoader.LoadImageAsync(cropWebpOut);
+            var loadedPngCrop = await ImageLoader.LoadImageAsync(cropPngOut);
+
+            Assert(loadedJpgCrop.PixelWidth == 400 && loadedJpgCrop.PixelHeight == 300, $"Crop JPG: {loadedJpgCrop.PixelWidth}x{loadedJpgCrop.PixelHeight}");
+            Assert(loadedWebpCrop.PixelWidth == 400 && loadedWebpCrop.PixelHeight == 300, $"Crop WebP: {loadedWebpCrop.PixelWidth}x{loadedWebpCrop.PixelHeight}");
+            Assert(loadedPngCrop.PixelWidth == 400 && loadedPngCrop.PixelHeight == 300, $"Crop PNG: {loadedPngCrop.PixelWidth}x{loadedPngCrop.PixelHeight}");
+
+            // Clean up temporary test files
+            try { File.Delete(cropJpgOut); File.Delete(cropWebpOut); File.Delete(cropPngOut); } catch { }
+
+            Log("  [PASS] Crop and Save verified (JPG, WebP, PNG: 400x300).");
+        }
+        catch (Exception ex)
+        {
+            Log($"  [FAIL] Crop and Save test failed: {ex.Message}");
+            allPassed = false;
+        }
+
         Log("========================================");
         if (allPassed)
         {
-            Log("   >>> ALL 8 TEST SUITES PASSED! <<<    ");
+            Log("   >>> ALL 9 TEST SUITES PASSED! <<<    ");
         }
         else
         {

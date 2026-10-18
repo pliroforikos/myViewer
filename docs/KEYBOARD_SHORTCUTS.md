@@ -52,7 +52,17 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | **`I`** | Toggle collapsible **EXIF & Metadata Sidebar** |
 | **`F1`** | Open / Close **About (Περί)** dialog with creator info & license |
 | **`F11`** | Toggle borderless **Fullscreen** mode |
-| **`Esc`** | Dismiss About dialog, EXIF sidebar, or exit Fullscreen |
+| **`Esc`** | Cancel Crop mode, dismiss About dialog, EXIF sidebar, or exit Fullscreen |
+
+---
+
+## ✂️ Cropping & Editing
+
+| Shortcut | Description |
+| :--- | :--- |
+| **`C`** | Enter / Exit interactive **Crop Mode** (Περικοπή) |
+| **`Enter`** | Open **Save As...** dialog to save cropped image |
+| **`Esc`** | Cancel crop selection and return to viewer |
 
 ---
 

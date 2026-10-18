@@ -277,6 +277,11 @@
                     <Path Data="{StaticResource IconFlipH}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
 
+                <!-- Crop Mode Toggle -->
+                <Button x:Name="BtnCropToggle" Style="{StaticResource HudIconButton}" Click="BtnCrop_Click" ToolTip="Crop Image / Περικοπή (C)">
+                    <Path Data="{StaticResource IconCrop}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
+                </Button>
+
                 <!-- Divider -->
                 <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="6,0" />
 
@@ -519,6 +524,163 @@
                 <TextBlock Text="⚡ Loading..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
             </StackPanel>
         </Border>
+
+        <!-- Crop Interactive Overlay (Covers the Viewport) -->
+        <Canvas x:Name="CropCanvas"
+                Visibility="Collapsed"
+                Background="Transparent"
+                ClipToBounds="True"
+                MouseDown="CropCanvas_MouseDown"
+                MouseMove="CropCanvas_MouseMove"
+                MouseUp="CropCanvas_MouseUp">
+
+            <!-- 4 Dark Dimmed Shades (outside crop rectangle) -->
+            <Rectangle x:Name="CropShadeTop" Fill="#99000000" />
+            <Rectangle x:Name="CropShadeBottom" Fill="#99000000" />
+            <Rectangle x:Name="CropShadeLeft" Fill="#99000000" />
+            <Rectangle x:Name="CropShadeRight" Fill="#99000000" />
+
+            <!-- The Active Crop Selection Box -->
+            <Border x:Name="CropBox"
+                    BorderBrush="{StaticResource AccentBrush}"
+                    BorderThickness="1.5"
+                    Background="#0500D2FF"
+                    Cursor="SizeAll">
+                <Grid>
+                    <!-- Rule-of-thirds grid guides -->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Rectangle Grid.Column="1" Grid.RowSpan="3" Width="1" HorizontalAlignment="Left" Fill="#26FFFFFF" />
+                    <Rectangle Grid.Column="1" Grid.RowSpan="3" Width="1" HorizontalAlignment="Right" Fill="#26FFFFFF" />
+                    <Rectangle Grid.Row="1" Grid.ColumnSpan="3" Height="1" VerticalAlignment="Top" Fill="#26FFFFFF" />
+                    <Rectangle Grid.Row="1" Grid.ColumnSpan="3" Height="1" VerticalAlignment="Bottom" Fill="#26FFFFFF" />
+                </Grid>
+            </Border>
+
+            <!-- 8 Resize Handles -->
+            <Rectangle x:Name="HandleNW" Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNWSE" />
+            <Rectangle x:Name="HandleNE" Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNESW" />
+            <Rectangle x:Name="HandleSW" Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNESW" />
+            <Rectangle x:Name="HandleSE" Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNWSE" />
+            <Rectangle x:Name="HandleN"  Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNS" />
+            <Rectangle x:Name="HandleS"  Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeNS" />
+            <Rectangle x:Name="HandleW"  Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeWE" />
+            <Rectangle x:Name="HandleE"  Width="10" Height="10" Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1" Cursor="SizeWE" />
+        </Canvas>
+
+        <!-- Floating Crop Toolbar -->
+        <Border x:Name="CropToolbar"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Background="#F013131A"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="1"
+                CornerRadius="22"
+                Padding="16,8">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="25" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.75" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Mode Title & Dimensions Pill -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <Path Data="{StaticResource IconCrop}" Fill="{StaticResource AccentBrush}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock Text="Περικοπή:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Border Background="#20202E" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtCropDimensions" Text="0 × 0 px" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    </Border>
+                </StackPanel>
+
+                <!-- Divider -->
+                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,12,0" />
+
+                <!-- Save As Button -->
+                <Button x:Name="BtnCropSaveAs"
+                        Click="BtnCropSaveAs_Click"
+                        Background="{StaticResource AccentBrush}"
+                        Foreground="#000000"
+                        FontWeight="Bold"
+                        FontSize="12"
+                        Padding="14,6"
+                        Margin="0,0,8,0"
+                        Cursor="Hand"
+                        ToolTip="Αποθήκευση με νέο όνομα αρχείου (ή επιλογή αρχείου)">
+                    <Button.Resources>
+                        <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                    </Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconSave}" Fill="#000000" Width="13" Height="13" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Αποθήκευση ως..." VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Overwrite Button -->
+                <Button x:Name="BtnCropOverwrite"
+                        Click="BtnCropOverwrite_Click"
+                        Background="#252538"
+                        BorderBrush="#FF8C00"
+                        BorderThickness="1"
+                        Foreground="#FFB040"
+                        FontWeight="SemiBold"
+                        FontSize="12"
+                        Padding="12,6"
+                        Margin="0,0,8,0"
+                        Cursor="Hand"
+                        ToolTip="Άμεση αντικατάσταση του αρχικού αρχείου">
+                    <Button.Resources>
+                        <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                    </Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Cancel Button -->
+                <Button x:Name="BtnCropCancel"
+                        Click="BtnCropCancel_Click"
+                        Background="Transparent"
+                        BorderBrush="#38384C"
+                        BorderThickness="1"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        FontWeight="SemiBold"
+                        FontSize="12"
+                        Padding="12,6"
+                        Cursor="Hand"
+                        ToolTip="Ακύρωση περικοπής (Esc)">
+                    <Button.Resources>
+                        <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                    </Button.Resources>
+                    <TextBlock Text="Ακύρωση" VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Toast Notification Badge (Auto-hiding success feedback) -->
+        <Border x:Name="ToastBadge"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,20,0,0"
+                Background="#E610B981"
+                CornerRadius="16"
+                Padding="16,8"
+                Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" ShadowDepth="2" Direction="270" Color="#000000" Opacity="0.5" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <Path Data="{StaticResource IconCheck}" Fill="#FFFFFF" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtToastMessage" Text="✓ Η εικόνα αποθηκεύτηκε επιτυχώς!" FontSize="12.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
         </Grid>
 
         <!-- About / Περί Modal Overlay (Spans entire window) -->
@@ -560,7 +722,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.2" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.3" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
