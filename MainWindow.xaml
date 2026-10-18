@@ -75,6 +75,32 @@
 
                 <!-- Right: Sort Pill & Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Update Available Notification Pill Button -->
+                    <Button x:Name="BtnUpdateAvailable"
+                            Click="BtnUpdateAvailable_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Background="#251640"
+                            BorderBrush="#A855F7"
+                            BorderThickness="1"
+                            Foreground="#E9D5FF"
+                            Cursor="Hand"
+                            Padding="10,3"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            ToolTip="Νέα έκδοση διαθέσιμη! Κάντε κλικ για λήψη &amp; εγκατάσταση">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="12" />
+                            </Style>
+                        </Button.Resources>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🚀 " FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TxtUpdateAvailableVersion" Text="v1.0.8" FontSize="11" FontWeight="Bold" Foreground="#00D2FF" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBlock Text="Ενημέρωση" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
                     <!-- About / Περί Button -->
                     <Button x:Name="BtnAbout"
                             Click="BtnAbout_Click"
@@ -1026,10 +1052,36 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.7" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.8" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
+                                <Border x:Name="BadgeUpdateStatus" Background="#14281E" BorderBrush="#10B981" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                    <TextBlock x:Name="TxtBadgeUpdateStatus" Text="✓ Τελευταία έκδοση" FontSize="10" FontWeight="SemiBold" Foreground="#10B981" />
+                                </Border>
+                                <Button x:Name="BtnAboutUpdateAction"
+                                        Click="BtnAboutUpdateAction_Click"
+                                        Background="#2D1B4E"
+                                        BorderBrush="#A855F7"
+                                        BorderThickness="1"
+                                        Foreground="#E9D5FF"
+                                        Cursor="Hand"
+                                        Padding="8,2"
+                                        Margin="6,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"
+                                        ToolTip="Λήψη και εγκατάσταση της νέας έκδοσης">
+                                    <Button.Resources>
+                                        <Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style>
+                                    </Button.Resources>
+                                    <TextBlock x:Name="TxtAboutUpdateAction" Text="🚀 Νέα v1.0.8!" FontSize="10.5" FontWeight="Bold" Foreground="#00D2FF" />
+                                </Button>
                             </StackPanel>
-                            <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Text=" • " FontSize="12" Foreground="#444455" />
+                                <Button Click="BtnManualCheckUpdate_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0">
+                                    <TextBlock x:Name="TxtManualCheckUpdate" Text="🔄 Έλεγχος για ενημερώσεις" FontSize="11" Foreground="#60A5FA" TextDecorations="Underline" />
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
 
                         <Button Grid.Column="2" Style="{StaticResource HudIconButton}" Width="32" Height="32" Click="BtnCloseAbout_Click" ToolTip="Κλείσιμο (Esc)">
@@ -1156,6 +1208,129 @@
                         </Button.Resources>
                         <TextBlock Text="Κλείσιμο" />
                     </Button>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Update Dialog Overlay -->
+        <Border x:Name="UpdateOverlay"
+                Grid.Row="0" Grid.RowSpan="2"
+                Background="#B307070A"
+                Visibility="Collapsed"
+                MouseDown="UpdateOverlay_BackgroundMouseDown">
+            <Border x:Name="UpdateCard"
+                    Background="#161622"
+                    BorderBrush="#383850"
+                    BorderThickness="1.5"
+                    CornerRadius="20"
+                    MaxWidth="520"
+                    Margin="24"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MouseDown="UpdateCard_MouseDown">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="35" ShadowDepth="8" Direction="270" Color="#000000" Opacity="0.75" />
+                </Border.Effect>
+
+                <StackPanel>
+                    <!-- Header -->
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="12" Background="#231B38" BorderBrush="#8B5CF6" BorderThickness="1" Margin="0,0,12,0">
+                            <TextBlock Text="🚀" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Ενημέρωση myView" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="TxtUpdateSubtitle" Text="Νέα έκδοση διαθέσιμη στο GitHub!" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <Button Grid.Column="2" Style="{StaticResource HudIconButton}" Width="32" Height="32" Click="BtnCloseUpdate_Click" ToolTip="Κλείσιμο (Esc)">
+                            <Path Data="{StaticResource IconClose}" Fill="{StaticResource TextSecondaryBrush}" Width="12" Height="12" Stretch="Uniform" />
+                        </Button>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#262636" Margin="0,0,0,16" />
+
+                    <!-- Version & Asset Card -->
+                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Τρέχουσα:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,6,0" />
+                                    <Border Background="#252538" CornerRadius="6" Padding="6,2" Margin="0,0,10,0">
+                                        <TextBlock x:Name="TxtCurrentVersionVal" Text="v1.0.7" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                    <TextBlock Text="Νέα έκδοση:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,6,0" />
+                                    <Border Background="#1E2A38" BorderBrush="#00D2FF" BorderThickness="1" CornerRadius="6" Padding="6,2">
+                                        <TextBlock x:Name="TxtNewVersionVal" Text="v1.0.8" FontSize="11" FontWeight="Bold" Foreground="#00D2FF" />
+                                    </Border>
+                                </StackPanel>
+                                <Border Grid.Column="1" Background="#261E38" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtAssetSizeVal" Text="~11.6 MB (Lite)" FontSize="11" FontWeight="SemiBold" Foreground="#C084FC" />
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Text="Σημειώσεις έκδοσης:" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <Border Background="#14141E" CornerRadius="8" Padding="10" MaxHeight="140">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="TxtReleaseNotes" Text="Νέες δυνατότητες και διορθώσεις." FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" LineHeight="16" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Download Progress Panel (Hidden until download starts) -->
+                    <StackPanel x:Name="PanelUpdateProgress" Visibility="Collapsed" Margin="0,0,0,16">
+                        <Grid Margin="0,0,0,6">
+                            <TextBlock x:Name="TxtDownloadStatus" Text="Λήψη πακέτου εγκατάστασης Lite..." FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="TxtDownloadPercent" Text="0%" HorizontalAlignment="Right" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        </Grid>
+                        <ProgressBar x:Name="BarDownloadProgress" Height="8" Minimum="0" Maximum="100" Value="0" Background="#1D1D28" Foreground="{StaticResource AccentBrush}" BorderThickness="0">
+                            <ProgressBar.Resources>
+                                <Style TargetType="Border"><Setter Property="CornerRadius" Value="4" /></Style>
+                            </ProgressBar.Resources>
+                        </ProgressBar>
+                    </StackPanel>
+
+                    <!-- Action Buttons -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Click="BtnViewReleaseNotesWeb_Click" Background="Transparent" Foreground="#60A5FA" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Left" Padding="0" VerticalAlignment="Center">
+                            <TextBlock Text="Προβολή στο GitHub ↗" FontSize="11" TextDecorations="Underline" />
+                        </Button>
+
+                        <Button Grid.Column="1" x:Name="BtnCancelUpdate" Click="BtnCloseUpdate_Click" Padding="18,9" Background="#252538" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
+                            <Button.Resources>
+                                <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                            </Button.Resources>
+                            <TextBlock Text="Άκυρο" />
+                        </Button>
+
+                        <Button Grid.Column="2" x:Name="BtnStartDownloadInstall" Click="BtnStartDownloadInstall_Click" Padding="20,9" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" BorderThickness="0" Cursor="Hand">
+                            <Button.Resources>
+                                <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⬇️ Λήψη &amp; Εγκατάσταση (Lite)" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
         </Border>

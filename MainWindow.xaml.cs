@@ -79,6 +79,11 @@ public partial class MainWindow : Window
     // CancellationToken for current decode
     private CancellationTokenSource? _loadCts;
 
+    // Auto-update state
+    private const string CurrentAppVersion = "1.0.8";
+    private UpdateInfo? _latestUpdateInfo;
+    private CancellationTokenSource? _downloadCts;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -118,6 +123,13 @@ public partial class MainWindow : Window
         {
             OpenFolder(args[1]);
         }
+
+        // Non-blocking background update check (delayed 2.5s to preserve instant startup)
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2500);
+            await CheckForUpdatesSilentlyAsync();
+        });
     }
 
     #region File & Folder Loading
@@ -773,7 +785,11 @@ public partial class MainWindow : Window
                 break;
 
             case Key.Escape:
-                if (AboutOverlay.Visibility == Visibility.Visible)
+                if (UpdateOverlay.Visibility == Visibility.Visible)
+                {
+                    BtnCloseUpdate_Click(sender, e);
+                }
+                else if (AboutOverlay.Visibility == Visibility.Visible)
                 {
                     AboutOverlay.Visibility = Visibility.Collapsed;
                 }
@@ -1303,6 +1319,209 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Could not open license:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    #endregion
+
+    #region Auto-Update Methods
+
+    private async Task CheckForUpdatesSilentlyAsync()
+    {
+        try
+        {
+            var info = await UpdateService.CheckForUpdatesAsync(CurrentAppVersion);
+            if (info != null)
+            {
+                _latestUpdateInfo = info;
+                Dispatcher.Invoke(() =>
+                {
+                    if (info.IsUpdateAvailable)
+                    {
+                        BtnUpdateAvailable.Visibility = Visibility.Visible;
+                        TxtUpdateAvailableVersion.Text = $"v{info.LatestVersion}";
+
+                        BtnAboutUpdateAction.Visibility = Visibility.Visible;
+                        TxtAboutUpdateAction.Text = $"🚀 Νέα v{info.LatestVersion}!";
+                        BadgeUpdateStatus.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        BtnUpdateAvailable.Visibility = Visibility.Collapsed;
+                        BadgeUpdateStatus.Visibility = Visibility.Visible;
+                        TxtBadgeUpdateStatus.Text = "✓ Τελευταία έκδοση";
+                        BtnAboutUpdateAction.Visibility = Visibility.Collapsed;
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Silent update check failed: {ex.Message}");
+        }
+    }
+
+    private void BtnUpdateAvailable_Click(object sender, RoutedEventArgs e)
+    {
+        ShowUpdateDialog();
+    }
+
+    private void BtnAboutUpdateAction_Click(object sender, RoutedEventArgs e)
+    {
+        ShowUpdateDialog();
+    }
+
+    private async void BtnManualCheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        TxtManualCheckUpdate.Text = "⏳ Έλεγχος...";
+        try
+        {
+            var info = await UpdateService.CheckForUpdatesAsync(CurrentAppVersion);
+            TxtManualCheckUpdate.Text = "🔄 Έλεγχος για ενημερώσεις";
+
+            if (info != null)
+            {
+                _latestUpdateInfo = info;
+                if (info.IsUpdateAvailable)
+                {
+                    BtnUpdateAvailable.Visibility = Visibility.Visible;
+                    TxtUpdateAvailableVersion.Text = $"v{info.LatestVersion}";
+                    BtnAboutUpdateAction.Visibility = Visibility.Visible;
+                    TxtAboutUpdateAction.Text = $"🚀 Νέα v{info.LatestVersion}!";
+                    BadgeUpdateStatus.Visibility = Visibility.Collapsed;
+                    ShowUpdateDialog();
+                }
+                else
+                {
+                    BtnUpdateAvailable.Visibility = Visibility.Collapsed;
+                    BadgeUpdateStatus.Visibility = Visibility.Visible;
+                    TxtBadgeUpdateStatus.Text = "✓ Τελευταία έκδοση";
+                    BtnAboutUpdateAction.Visibility = Visibility.Collapsed;
+                    ShowToast($"✓ Έχετε ήδη την τελευταία έκδοση (v{CurrentAppVersion})!");
+                }
+            }
+            else
+            {
+                ShowToast("⚠️ Δεν ήταν δυνατή η σύνδεση με το GitHub.");
+            }
+        }
+        catch
+        {
+            TxtManualCheckUpdate.Text = "🔄 Έλεγχος για ενημερώσεις";
+            ShowToast("⚠️ Δεν ήταν δυνατή η σύνδεση με το GitHub.");
+        }
+    }
+
+    private void ShowUpdateDialog()
+    {
+        if (_latestUpdateInfo == null) return;
+
+        TxtCurrentVersionVal.Text = $"v{CurrentAppVersion}";
+        TxtNewVersionVal.Text = $"v{_latestUpdateInfo.LatestVersion}";
+        TxtAssetSizeVal.Text = _latestUpdateInfo.AssetSize > 0
+            ? $"~{(_latestUpdateInfo.AssetSize / 1048576.0):0.1} MB (Lite)"
+            : "~11.6 MB (Lite)";
+
+        string notes = string.IsNullOrWhiteSpace(_latestUpdateInfo.ReleaseNotes)
+            ? _latestUpdateInfo.ReleaseName
+            : _latestUpdateInfo.ReleaseNotes;
+        TxtReleaseNotes.Text = notes;
+
+        PanelUpdateProgress.Visibility = Visibility.Collapsed;
+        BarDownloadProgress.Value = 0;
+        TxtDownloadPercent.Text = "0%";
+        BtnStartDownloadInstall.IsEnabled = true;
+        BtnCancelUpdate.IsEnabled = true;
+
+        AboutOverlay.Visibility = Visibility.Collapsed;
+        UpdateOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void BtnCloseUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_downloadCts != null && !_downloadCts.IsCancellationRequested)
+        {
+            try { _downloadCts.Cancel(); } catch { }
+        }
+        UpdateOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateOverlay_BackgroundMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        BtnCloseUpdate_Click(sender, e);
+    }
+
+    private void UpdateCard_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void BtnViewReleaseNotesWeb_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string url = !string.IsNullOrEmpty(_latestUpdateInfo?.ReleaseUrl)
+                ? _latestUpdateInfo.ReleaseUrl
+                : "https://github.com/pliroforikos/myViewer/releases";
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open browser:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void BtnStartDownloadInstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (_latestUpdateInfo == null || string.IsNullOrWhiteSpace(_latestUpdateInfo.DownloadUrl))
+        {
+            MessageBox.Show("Δεν βρέθηκε σύνδεσμος λήψης του πακέτου εγκατάστασης Lite.", "myView Update", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        BtnStartDownloadInstall.IsEnabled = false;
+        PanelUpdateProgress.Visibility = Visibility.Visible;
+        BarDownloadProgress.Value = 0;
+        TxtDownloadPercent.Text = "0%";
+        TxtDownloadStatus.Text = "Λήψη πακέτου εγκατάστασης Lite...";
+
+        string assetName = !string.IsNullOrWhiteSpace(_latestUpdateInfo.AssetName)
+            ? _latestUpdateInfo.AssetName
+            : $"myView-v{_latestUpdateInfo.LatestVersion}-lightweight-setup.exe";
+
+        string tempPath = Path.Combine(Path.GetTempPath(), assetName);
+        _downloadCts = new CancellationTokenSource();
+
+        var progress = new Progress<double>(p =>
+        {
+            double pct = Math.Clamp(p * 100.0, 0.0, 100.0);
+            BarDownloadProgress.Value = pct;
+            TxtDownloadPercent.Text = $"{pct:0}%";
+        });
+
+        try
+        {
+            await UpdateService.DownloadInstallerAsync(_latestUpdateInfo.DownloadUrl, tempPath, progress, _downloadCts.Token);
+
+            TxtDownloadStatus.Text = "✓ Η λήψη ολοκληρώθηκε! Εκκίνηση εγκατάστασης...";
+            BarDownloadProgress.Value = 100;
+            TxtDownloadPercent.Text = "100%";
+
+            await Task.Delay(600);
+
+            UpdateService.LaunchInstaller(tempPath);
+            Application.Current.Shutdown();
+        }
+        catch (OperationCanceledException)
+        {
+            TxtDownloadStatus.Text = "Η λήψη ακυρώθηκε.";
+            BtnStartDownloadInstall.IsEnabled = true;
+        }
+        catch (Exception ex)
+        {
+            TxtDownloadStatus.Text = "Αποτυχία λήψης.";
+            BtnStartDownloadInstall.IsEnabled = true;
+            MessageBox.Show($"Αποτυχία λήψης της ενημέρωσης:\n{ex.Message}", "myView Update", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

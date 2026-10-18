@@ -343,10 +343,41 @@ public static class SelfTest
             allPassed = false;
         }
 
+        // Test Suite 12: Update Service (GitHub Releases check & Asset parsing)
+        Log("\n--- Suite 12: Update Service & GitHub Releases ---");
+        try
+        {
+            // 1. Check with a historical old version "1.0.0" -> update should be available
+            var info = await UpdateService.CheckForUpdatesAsync("1.0.0");
+
+            if (info != null)
+            {
+                Assert(info.IsUpdateAvailable, "Update should be available for version 1.0.0");
+                Assert(!string.IsNullOrEmpty(info.LatestVersion), "LatestVersion should not be empty");
+                Assert(!string.IsNullOrEmpty(info.DownloadUrl), "DownloadUrl should not be empty");
+                Assert(info.DownloadUrl.Contains("lightweight", StringComparison.OrdinalIgnoreCase), "DownloadUrl should point to lightweight installer");
+                Log($"  [PASS] Update check for older version verified (Latest: v{info.LatestVersion}, Asset: {info.AssetName}).");
+
+                // 2. Check with a future version "99.0.0" -> update should NOT be available
+                var noUpdateInfo = await UpdateService.CheckForUpdatesAsync("99.0.0");
+                Assert(noUpdateInfo != null && !noUpdateInfo.IsUpdateAvailable, "Update should NOT be available for version 99.0.0");
+                Log("  [PASS] Up-to-date check verified (no false positive for current/future versions).");
+            }
+            else
+            {
+                Log("  [SKIP] GitHub API unreachable or rate-limited in test environment.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"  [FAIL] UpdateService test failed: {ex.Message}");
+            allPassed = false;
+        }
+
         Log("========================================");
         if (allPassed)
         {
-            Log("   >>> ALL 11 TEST SUITES PASSED! <<<   ");
+            Log("   >>> ALL 12 TEST SUITES PASSED! <<<   ");
         }
         else
         {
