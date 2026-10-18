@@ -2,7 +2,7 @@
 ; Inno Setup 6 Script - Lightweight Edition (Framework Dependent)
 
 #define MyAppName "myView (Lightweight)"
-#define MyAppVersion "1.0.6"
+#define MyAppVersion "1.0.7"
 #define MyAppPublisher "Λέων Προκόπης (plarg.gr)"
 #define MyAppURL "https://plarg.gr"
 #define MyAppExeName "myView.exe"
@@ -21,7 +21,7 @@ DefaultGroupName=myView
 AllowNoIcons=yes
 LicenseFile=..\LICENSE
 OutputDir=..\dist
-OutputBaseFilename=myView-v1.0.6-lightweight-setup
+OutputBaseFilename=myView-v1.0.7-lightweight-setup
 SetupIconFile=..\app.ico
 Compression=lzma2/max
 SolidCompression=yes

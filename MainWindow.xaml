@@ -1026,7 +1026,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.6" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.7" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
