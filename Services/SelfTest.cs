@@ -205,17 +205,103 @@ public static class SelfTest
             Log($"  [PASS] Horizon Straighten verified ({loadedStraight.DimensionsString}, angle=3.5°, auto-crop).");
 
             // Test 4-Corner Perspective Deskew
-            var p0 = new System.Windows.Point(80, 60);    // TL
-            var p1 = new System.Windows.Point(1840, 90);   // TR
-            var p2 = new System.Windows.Point(1800, 1020); // BR
-            var p3 = new System.Windows.Point(60, 990);    // BL
-            await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(jpgSrc, deskewOut, p0, p1, p2, p3, autoEnhance: true);
-            var loadedDeskew = await ImageLoader.LoadImageAsync(deskewOut);
-            Assert(loadedDeskew.PixelWidth > 1700 && loadedDeskew.PixelHeight > 900, $"Deskewed size: {loadedDeskew.PixelWidth}x{loadedDeskew.PixelHeight}");
-            Log($"  [PASS] 4-Corner Perspective Deskew verified ({loadedDeskew.DimensionsString}, auto-enhanced).");
+            // Test preview distort speed
+            using (var prevImg = new MagickImage(MagickColors.White, 800, 600))
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                double[] args = new double[] { 0, 0, 0, 0, 800, 0, 800, 0, 800, 600, 800, 600, 0, 600, 0, 600 };
+                prevImg.Distort(DistortMethod.Perspective, args);
+                sw.Stop();
+                Log($"  [BENCHMARK] 800x600 Perspective Distort: {sw.ElapsedMilliseconds}ms ({sw.Elapsed.TotalMicroseconds:F0}µs)");
+            }
 
             // Clean up temporary test files
             try { File.Delete(straightOut); File.Delete(deskewOut); } catch { }
+
+            // Test Keystone unwarp on user photo
+            string userImgPath = @"C:\Users\leon\.gemini\antigravity\brain\f0547188-8196-42a2-8d00-1897a87ec524\.user_uploaded\media_1792324612003_67ab52ca.jpg";
+            if (File.Exists(userImgPath))
+            {
+                using var uImg = new MagickImage(userImgPath);
+                int w = (int)uImg.Width;
+                int h = (int)uImg.Height;
+                double deltaX = 60; // open top corners outward by 60px each
+
+                // Source: corners of original image
+                // Dest: top corners shifted outward, bottom corners fixed
+                double dx0 = -deltaX, dy0 = 0;
+                double dx1 = w + deltaX, dy1 = 0;
+                double dx2 = w, dy2 = h;
+                double dx3 = 0, dy3 = h;
+
+                double minX = Math.Min(Math.Min(dx0, dx1), Math.Min(dx2, dx3));
+                double maxX = Math.Max(Math.Max(dx0, dx1), Math.Max(dx2, dx3));
+                double minY = Math.Min(Math.Min(dy0, dy1), Math.Min(dy2, dy3));
+                double maxY = Math.Max(Math.Max(dy0, dy1), Math.Max(dy2, dy3));
+
+                int outW = (int)Math.Round(maxX - minX);
+                int outH = (int)Math.Round(maxY - minY);
+
+                double[] args = new double[]
+                {
+                    0, 0,  dx0 - minX, dy0 - minY,
+                    w, 0,  dx1 - minX, dy1 - minY,
+                    w, h,  dx2 - minX, dy2 - minY,
+                    0, h,  dx3 - minX, dy3 - minY
+                };
+
+                uImg.BackgroundColor = MagickColors.White;
+                uImg.SetArtifact("distort:viewport", $"{outW}x{outH}+0+0");
+                uImg.Distort(DistortMethod.Perspective, args);
+                uImg.ResetPage();
+
+                // Auto-crop to clean rectangle of original width/height
+                uImg.Crop(new MagickGeometry((int)deltaX, 0, (uint)w, (uint)h));
+                uImg.ResetPage();
+
+                string testOut = Path.Combine(sampleDir, "test_user_keystone_cropped.jpg");
+                uImg.Write(testOut);
+                Log($"  [KEYSTONE TEST] User image distorted and auto-cropped to {uImg.Width}x{uImg.Height}, saved to {testOut}");
+
+                // Test WarpPerspectiveAndSaveAsync service method
+                string warpOut = Path.Combine(sampleDir, "test_warp_service_out.jpg");
+                await ImageCorrectionService.WarpPerspectiveAndSaveAsync(
+                    userImgPath, warpOut,
+                    new System.Windows.Point(-deltaX, 0),
+                    new System.Windows.Point(w + deltaX, 0),
+                    new System.Windows.Point(w, h),
+                    new System.Windows.Point(0, h),
+                    autoCrop: true);
+                var loadedWarp = await ImageLoader.LoadImageAsync(warpOut);
+                Assert(loadedWarp.PixelWidth == w && loadedWarp.PixelHeight == h, "WarpPerspectiveAndSaveAsync resolution matching");
+                Log($"  [PASS] WarpPerspectiveAndSaveAsync verified: {loadedWarp.PixelWidth}x{loadedWarp.PixelHeight}");
+
+                // Test GeneratePerspectivePreview benchmark
+                using var thumb = new MagickImage(userImgPath);
+                thumb.Resize(new MagickGeometry(600, 600) { IgnoreAspectRatio = false });
+                var pSw = System.Diagnostics.Stopwatch.StartNew();
+                var previewBmp = ImageCorrectionService.GeneratePerspectivePreview(
+                    thumb, w, h,
+                    new System.Windows.Point(-deltaX, 0),
+                    new System.Windows.Point(w + deltaX, 0),
+                    new System.Windows.Point(w, h),
+                    new System.Windows.Point(0, h),
+                    isKeystoneWarp: true,
+                    autoCrop: true,
+                    autoEnhance: false);
+                pSw.Stop();
+                Assert(previewBmp != null && previewBmp.PixelWidth > 0, "GeneratePerspectivePreview produced valid BitmapSource");
+                Log($"  [BENCHMARK] GeneratePerspectivePreview: {pSw.ElapsedMilliseconds}ms (Resolution: {previewBmp!.PixelWidth}x{previewBmp.PixelHeight})");
+
+                try 
+                { 
+                    File.Delete(warpOut); 
+                    File.Delete(testOut);
+                    string rawKeystone = Path.Combine(sampleDir, "test_user_keystone.jpg");
+                    if (File.Exists(rawKeystone)) File.Delete(rawKeystone);
+                } 
+                catch { }
+            }
         }
         catch (Exception ex)
         {

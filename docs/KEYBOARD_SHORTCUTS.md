@@ -62,7 +62,7 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | :--- | :--- |
 | **`C`** | Enter / Exit interactive **Crop Mode** (Περικοπή εικόνας) |
 | **`E`** | Enter / Exit **Horizon Straightening Mode** (Ευθυγράμμιση Ορίζοντα & μικρο-περιστροφή) |
-| **`P`** | Enter / Exit **Perspective & Document Skew Mode** (Ίσιωμα εγγράφου από τις 4 γωνίες) |
+| **`P`** | Enter / Exit **Perspective & Keystone Mode** (Διόρθωση προοπτικής & άνοιγμα γωνιών εγγράφου) |
 | **`Enter`** | Open **Save As...** dialog to save edited/straightened image (in editing mode) |
 | **`Esc`** | Cancel active edit/crop selection and return to standard viewer |
 

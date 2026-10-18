@@ -62,11 +62,19 @@ public partial class MainWindow : Window
 
     // Perspective / 4-Corner Document Skew state
     private bool _isPerspectiveMode = false;
+    private bool _isKeystoneMode = true; // true: Keystone Warp (Άνοιγμα), false: Quad Crop
     private readonly Point[] _perspectivePixels = new Point[4]; // TL, TR, BR, BL in oriented image pixels
     private readonly Point[] _perspectiveScreen = new Point[4]; // TL, TR, BR, BL on screen canvas
     private int _perspectiveDragHandle = -1; // -1: None, 0: TL, 1: TR, 2: BR, 3: BL, 4: Move all
     private Point _perspectiveDragStartPt;
+    private Point[]? _perspectiveStartPixels;
     private Point[]? _perspectiveStartScreen;
+    private ImageSource? _perspectiveOriginalSource;
+    private ImageMagick.MagickImage? _perspectivePreviewBase;
+    private readonly DispatcherTimer _perspectivePreviewTimer = new() { Interval = TimeSpan.FromMilliseconds(20) };
+    private bool _isGeneratingPerspectivePreview = false;
+    private bool _perspectivePreviewDirty = false;
+    private bool _suppressKeystoneSliderEvent = false;
 
     // CancellationToken for current decode
     private CancellationTokenSource? _loadCts;
@@ -74,6 +82,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        _perspectivePreviewTimer.Tick += PerspectivePreviewTimer_Tick;
 
         _folderNav.SelectionChanged += FolderNav_SelectionChanged;
         _folderNav.FolderReloaded += FolderNav_FolderReloaded;
@@ -1921,6 +1931,7 @@ public partial class MainWindow : Window
         if (iw <= 0 || ih <= 0) return;
 
         _isPerspectiveMode = true;
+        _perspectiveOriginalSource = DisplayImage.Source;
 
         BottomHudBar.Visibility = Visibility.Collapsed;
         ExifSidebar.Visibility = Visibility.Collapsed;
@@ -1928,20 +1939,92 @@ public partial class MainWindow : Window
         PerspectiveCanvas.Visibility = Visibility.Visible;
         PerspectiveToolbar.Visibility = Visibility.Visible;
 
-        // Default: 4 corner pins with 6% margin from image bounds
-        _perspectivePixels[0] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.06)); // TL
-        _perspectivePixels[1] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.06)); // TR
-        _perspectivePixels[2] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.94)); // BR
-        _perspectivePixels[3] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.94)); // BL
+        // Load thumbnail for fast real-time preview (<20ms per distortion)
+        try
+        {
+            _perspectivePreviewBase?.Dispose();
+            string? filePath = _folderNav.CurrentItem?.FilePath;
+            if (filePath != null && File.Exists(filePath))
+            {
+                _perspectivePreviewBase = new ImageMagick.MagickImage(filePath);
+                try { _perspectivePreviewBase.AutoOrient(); } catch { }
+                if (_flipH) _perspectivePreviewBase.Flop();
+                if (_rotation != 0) _perspectivePreviewBase.Rotate(_rotation);
+
+                int maxDim = 720;
+                if (_perspectivePreviewBase.Width > maxDim || _perspectivePreviewBase.Height > maxDim)
+                {
+                    _perspectivePreviewBase.Resize(new ImageMagick.MagickGeometry((uint)maxDim, (uint)maxDim) { IgnoreAspectRatio = false });
+                }
+            }
+        }
+        catch
+        {
+            _perspectivePreviewBase = null;
+        }
+
+        ResetPerspectiveCorners();
+    }
+
+    private void ResetPerspectiveCorners()
+    {
+        GetOrientedDimensions(out double iw, out double ih);
+        if (iw <= 0 || ih <= 0) return;
+
+        _suppressKeystoneSliderEvent = true;
+        SliderKeystoneTop.Value = 0;
+        TxtKeystoneValue.Text = "0%";
+        _suppressKeystoneSliderEvent = false;
+
+        if (_isKeystoneMode)
+        {
+            // Initial corner pins exactly on image rectangle bounds
+            _perspectivePixels[0] = new Point(0, 0);       // TL
+            _perspectivePixels[1] = new Point(iw, 0);      // TR
+            _perspectivePixels[2] = new Point(iw, ih);     // BR
+            _perspectivePixels[3] = new Point(0, ih);      // BL
+        }
+        else
+        {
+            // In Quad Crop mode, start 6% inside image so handles can be grabbed
+            _perspectivePixels[0] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.06));
+            _perspectivePixels[1] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.06));
+            _perspectivePixels[2] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.94));
+            _perspectivePixels[3] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.94));
+        }
 
         UpdatePerspectiveScreenFromPixels();
+        RequestPerspectivePreview();
     }
 
     private void ExitPerspectiveMode()
     {
         _isPerspectiveMode = false;
         _perspectiveDragHandle = -1;
-        PerspectiveCanvas.ReleaseMouseCapture();
+        _perspectivePreviewTimer.Stop();
+
+        try
+        {
+            PerspectiveCanvas.ReleaseMouseCapture();
+        }
+        catch { }
+
+        // Restore original display image
+        if (_perspectiveOriginalSource != null)
+        {
+            DisplayImage.Source = _perspectiveOriginalSource;
+            _perspectiveOriginalSource = null;
+        }
+
+        if (_currentData != null)
+        {
+            DisplayImage.Width = _currentData.PixelWidth;
+            DisplayImage.Height = _currentData.PixelHeight;
+            ApplyTransforms();
+        }
+
+        _perspectivePreviewBase?.Dispose();
+        _perspectivePreviewBase = null;
 
         PerspectiveCanvas.Visibility = Visibility.Collapsed;
         PerspectiveToolbar.Visibility = Visibility.Collapsed;
@@ -1961,21 +2044,6 @@ public partial class MainWindow : Window
         UpdatePerspectiveUi();
     }
 
-    private void UpdatePerspectivePixelsFromScreen()
-    {
-        GetOrientedDimensions(out double iw, out double ih);
-
-        for (int i = 0; i < 4; i++)
-        {
-            Point pt = ScreenToImage(_perspectiveScreen[i]);
-            _perspectivePixels[i] = new Point(
-                Math.Clamp(Math.Round(pt.X), 0, iw),
-                Math.Clamp(Math.Round(pt.Y), 0, ih));
-        }
-
-        UpdatePerspectiveUi();
-    }
-
     private void UpdatePerspectiveUi()
     {
         if (!_isPerspectiveMode || _currentData == null) return;
@@ -1990,7 +2058,7 @@ public partial class MainWindow : Window
         Canvas.SetLeft(HandleBR, _perspectiveScreen[2].X); Canvas.SetTop(HandleBR, _perspectiveScreen[2].Y);
         Canvas.SetLeft(HandleBL, _perspectiveScreen[3].X); Canvas.SetTop(HandleBL, _perspectiveScreen[3].Y);
 
-        // 2. Dark shaded inverted background
+        // 2. Subtle shaded background
         var shadeGeom = new PathGeometry { FillRule = FillRule.EvenOdd };
         var figVw = new PathFigure { StartPoint = new Point(0, 0), IsClosed = true };
         figVw.Segments.Add(new LineSegment(new Point(vw, 0), false));
@@ -2021,14 +2089,12 @@ public partial class MainWindow : Window
         double[] fracs = { 1.0 / 3.0, 2.0 / 3.0 };
         foreach (double f in fracs)
         {
-            // Vertical-like line
             Point top = new Point(p0.X + (p1.X - p0.X) * f, p0.Y + (p1.Y - p0.Y) * f);
             Point bot = new Point(p3.X + (p2.X - p3.X) * f, p3.Y + (p2.Y - p3.Y) * f);
             var vFig = new PathFigure { StartPoint = top, IsClosed = false };
             vFig.Segments.Add(new LineSegment(bot, true));
             meshGeom.Figures.Add(vFig);
 
-            // Horizontal-like line
             Point left = new Point(p0.X + (p3.X - p0.X) * f, p0.Y + (p3.Y - p0.Y) * f);
             Point right = new Point(p1.X + (p2.X - p1.X) * f, p1.Y + (p2.Y - p1.Y) * f);
             var hFig = new PathFigure { StartPoint = left, IsClosed = false };
@@ -2036,22 +2102,11 @@ public partial class MainWindow : Window
             meshGeom.Figures.Add(hFig);
         }
         PerspectiveMeshLines.Data = meshGeom;
-
-        // 5. Output dimensions estimate
-        double w1 = Math.Sqrt(Math.Pow(_perspectivePixels[1].X - _perspectivePixels[0].X, 2) + Math.Pow(_perspectivePixels[1].Y - _perspectivePixels[0].Y, 2));
-        double w2 = Math.Sqrt(Math.Pow(_perspectivePixels[2].X - _perspectivePixels[3].X, 2) + Math.Pow(_perspectivePixels[2].Y - _perspectivePixels[3].Y, 2));
-        int estW = (int)Math.Round(Math.Max(w1, w2));
-
-        double h1 = Math.Sqrt(Math.Pow(_perspectivePixels[3].X - _perspectivePixels[0].X, 2) + Math.Pow(_perspectivePixels[3].Y - _perspectivePixels[0].Y, 2));
-        double h2 = Math.Sqrt(Math.Pow(_perspectivePixels[2].X - _perspectivePixels[1].X, 2) + Math.Pow(_perspectivePixels[2].Y - _perspectivePixels[1].Y, 2));
-        int estH = (int)Math.Round(Math.Max(h1, h2));
-
-        TxtPerspectiveDimensions.Text = $"{estW} × {estH} px";
     }
 
     private int GetPerspectiveHitTestHandle(Point pt)
     {
-        double tol = 24.0;
+        double tol = 26.0;
         for (int i = 0; i < 4; i++)
         {
             double d = Math.Sqrt(Math.Pow(pt.X - _perspectiveScreen[i].X, 2) + Math.Pow(pt.Y - _perspectiveScreen[i].Y, 2));
@@ -2086,6 +2141,7 @@ public partial class MainWindow : Window
         _perspectiveDragHandle = GetPerspectiveHitTestHandle(pt);
         _perspectiveDragStartPt = pt;
         _perspectiveStartScreen = (Point[])_perspectiveScreen.Clone();
+        _perspectiveStartPixels = (Point[])_perspectivePixels.Clone();
 
         if (_perspectiveDragHandle != -1)
         {
@@ -2111,15 +2167,66 @@ public partial class MainWindow : Window
         }
 
         GetOrientedDimensions(out double iw, out double ih);
+        if (iw <= 0 || ih <= 0 || _perspectiveStartPixels == null) return;
+
+        bool symmetric = ChkPerspectiveSymmetric.IsChecked == true && _isKeystoneMode;
 
         if (_perspectiveDragHandle >= 0 && _perspectiveDragHandle < 4)
         {
             Point imgPt = ScreenToImage(pt);
-            imgPt.X = Math.Clamp(Math.Round(imgPt.X), 0, iw);
-            imgPt.Y = Math.Clamp(Math.Round(imgPt.Y), 0, ih);
-            _perspectivePixels[_perspectiveDragHandle] = imgPt;
-            _perspectiveScreen[_perspectiveDragHandle] = ImageToScreen(imgPt);
+            int h = _perspectiveDragHandle;
+
+            if (symmetric)
+            {
+                if (h == 0) // TL
+                {
+                    double dx = imgPt.X - 0;
+                    double dy = imgPt.Y;
+                    _perspectivePixels[0] = new Point(imgPt.X, dy);
+                    _perspectivePixels[1] = new Point(iw - dx, dy);
+
+                    double pct = (-dx / (iw * 0.5)) * 100.0;
+                    UpdateKeystoneSliderNoEvent(pct);
+                }
+                else if (h == 1) // TR
+                {
+                    double dx = imgPt.X - iw;
+                    double dy = imgPt.Y;
+                    _perspectivePixels[1] = new Point(imgPt.X, dy);
+                    _perspectivePixels[0] = new Point(0 - dx, dy);
+
+                    double pct = (dx / (iw * 0.5)) * 100.0;
+                    UpdateKeystoneSliderNoEvent(pct);
+                }
+                else if (h == 3) // BL
+                {
+                    double dx = imgPt.X - 0;
+                    double dy = imgPt.Y;
+                    _perspectivePixels[3] = new Point(imgPt.X, dy);
+                    _perspectivePixels[2] = new Point(iw - dx, dy);
+                }
+                else if (h == 2) // BR
+                {
+                    double dx = imgPt.X - iw;
+                    double dy = imgPt.Y;
+                    _perspectivePixels[2] = new Point(imgPt.X, dy);
+                    _perspectivePixels[3] = new Point(0 - dx, dy);
+                }
+
+                _perspectiveScreen[0] = ImageToScreen(_perspectivePixels[0]);
+                _perspectiveScreen[1] = ImageToScreen(_perspectivePixels[1]);
+                _perspectiveScreen[2] = ImageToScreen(_perspectivePixels[2]);
+                _perspectiveScreen[3] = ImageToScreen(_perspectivePixels[3]);
+            }
+            else
+            {
+                // Independent corner dragging (no boundaries clamped!)
+                _perspectivePixels[h] = imgPt;
+                _perspectiveScreen[h] = ImageToScreen(imgPt);
+            }
+
             UpdatePerspectiveUi();
+            RequestPerspectivePreview();
         }
         else if (_perspectiveDragHandle == 4 && _perspectiveStartScreen != null)
         {
@@ -2129,13 +2236,12 @@ public partial class MainWindow : Window
             for (int i = 0; i < 4; i++)
             {
                 Point newScr = new Point(_perspectiveStartScreen[i].X + dx, _perspectiveStartScreen[i].Y + dy);
-                Point imgPt = ScreenToImage(newScr);
-                imgPt.X = Math.Clamp(Math.Round(imgPt.X), 0, iw);
-                imgPt.Y = Math.Clamp(Math.Round(imgPt.Y), 0, ih);
-                _perspectivePixels[i] = imgPt;
-                _perspectiveScreen[i] = ImageToScreen(imgPt);
+                _perspectivePixels[i] = ScreenToImage(newScr);
+                _perspectiveScreen[i] = newScr;
             }
+
             UpdatePerspectiveUi();
+            RequestPerspectivePreview();
         }
 
         e.Handled = true;
@@ -2146,22 +2252,148 @@ public partial class MainWindow : Window
         if (_perspectiveDragHandle != -1)
         {
             _perspectiveDragHandle = -1;
-            PerspectiveCanvas.ReleaseMouseCapture();
+            try { PerspectiveCanvas.ReleaseMouseCapture(); } catch { }
             e.Handled = true;
+        }
+    }
+
+    private void SliderKeystoneTop_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressKeystoneSliderEvent || !_isPerspectiveMode) return;
+
+        GetOrientedDimensions(out double iw, out double ih);
+        if (iw <= 0 || ih <= 0) return;
+
+        double pct = SliderKeystoneTop.Value;
+        TxtKeystoneValue.Text = $"{(pct > 0 ? "+" : "")}{Math.Round(pct)}%";
+
+        double dx = (pct / 100.0) * (iw * 0.5);
+        _perspectivePixels[0] = new Point(-dx, _perspectivePixels[0].Y);
+        _perspectivePixels[1] = new Point(iw + dx, _perspectivePixels[1].Y);
+
+        _perspectiveScreen[0] = ImageToScreen(_perspectivePixels[0]);
+        _perspectiveScreen[1] = ImageToScreen(_perspectivePixels[1]);
+
+        UpdatePerspectiveUi();
+        RequestPerspectivePreview();
+    }
+
+    private void UpdateKeystoneSliderNoEvent(double pct)
+    {
+        _suppressKeystoneSliderEvent = true;
+        pct = Math.Clamp(pct, SliderKeystoneTop.Minimum, SliderKeystoneTop.Maximum);
+        SliderKeystoneTop.Value = pct;
+        TxtKeystoneValue.Text = $"{(pct > 0 ? "+" : "")}{Math.Round(pct)}%";
+        _suppressKeystoneSliderEvent = false;
+    }
+
+    private void BtnKeystoneInc_Click(object sender, RoutedEventArgs e)
+    {
+        SliderKeystoneTop.Value = Math.Min(SliderKeystoneTop.Maximum, SliderKeystoneTop.Value + 1);
+    }
+
+    private void BtnKeystoneDec_Click(object sender, RoutedEventArgs e)
+    {
+        SliderKeystoneTop.Value = Math.Max(SliderKeystoneTop.Minimum, SliderKeystoneTop.Value - 1);
+    }
+
+    private void BtnModeKeystone_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isKeystoneMode) return;
+        _isKeystoneMode = true;
+        BtnModeKeystone.Background = (Brush)FindResource("AccentBrush");
+        BtnModeKeystone.Foreground = Brushes.Black;
+        BtnModeKeystone.FontWeight = FontWeights.Bold;
+
+        BtnModeQuadCrop.Background = Brushes.Transparent;
+        BtnModeQuadCrop.Foreground = (Brush)FindResource("TextSecondaryBrush");
+        BtnModeQuadCrop.FontWeight = FontWeights.Normal;
+
+        KeystoneSliderPanel.Visibility = Visibility.Visible;
+        ChkPerspectiveCrop.Visibility = Visibility.Visible;
+        ResetPerspectiveCorners();
+    }
+
+    private void BtnModeQuadCrop_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isKeystoneMode) return;
+        _isKeystoneMode = false;
+        BtnModeQuadCrop.Background = (Brush)FindResource("AccentBrush");
+        BtnModeQuadCrop.Foreground = Brushes.Black;
+        BtnModeQuadCrop.FontWeight = FontWeights.Bold;
+
+        BtnModeKeystone.Background = Brushes.Transparent;
+        BtnModeKeystone.Foreground = (Brush)FindResource("TextSecondaryBrush");
+        BtnModeKeystone.FontWeight = FontWeights.Normal;
+
+        KeystoneSliderPanel.Visibility = Visibility.Collapsed;
+        ChkPerspectiveCrop.Visibility = Visibility.Collapsed;
+        ResetPerspectiveCorners();
+    }
+
+    private void ChkPerspective_SettingChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isPerspectiveMode) return;
+        RequestPerspectivePreview();
+    }
+
+    private void RequestPerspectivePreview()
+    {
+        _perspectivePreviewDirty = true;
+        _perspectivePreviewTimer.Stop();
+        _perspectivePreviewTimer.Start();
+    }
+
+    private async void PerspectivePreviewTimer_Tick(object? sender, EventArgs e)
+    {
+        _perspectivePreviewTimer.Stop();
+        if (!_perspectivePreviewDirty || !_isPerspectiveMode || _isGeneratingPerspectivePreview || _perspectivePreviewBase == null)
+            return;
+
+        _perspectivePreviewDirty = false;
+        _isGeneratingPerspectivePreview = true;
+
+        GetOrientedDimensions(out double iw, out double ih);
+        Point p0 = _perspectivePixels[0];
+        Point p1 = _perspectivePixels[1];
+        Point p2 = _perspectivePixels[2];
+        Point p3 = _perspectivePixels[3];
+        bool isKeystone = _isKeystoneMode;
+        bool autoCrop = ChkPerspectiveCrop.IsChecked == true;
+        bool autoEnhance = ChkPerspectiveEnhance.IsChecked == true;
+
+        try
+        {
+            var previewBmp = await Task.Run(() =>
+            {
+                return ImageCorrectionService.GeneratePerspectivePreview(
+                    _perspectivePreviewBase,
+                    iw, ih,
+                    p0, p1, p2, p3,
+                    isKeystone,
+                    autoCrop,
+                    autoEnhance);
+            });
+
+            if (_isPerspectiveMode && previewBmp != null)
+            {
+                DisplayImage.Source = previewBmp;
+            }
+        }
+        catch { }
+        finally
+        {
+            _isGeneratingPerspectivePreview = false;
+            if (_perspectivePreviewDirty)
+            {
+                _perspectivePreviewTimer.Start();
+            }
         }
     }
 
     private void BtnPerspectiveReset_Click(object sender, RoutedEventArgs e)
     {
-        GetOrientedDimensions(out double iw, out double ih);
-        if (iw <= 0 || ih <= 0) return;
-
-        _perspectivePixels[0] = new Point(0, 0);
-        _perspectivePixels[1] = new Point(iw, 0);
-        _perspectivePixels[2] = new Point(iw, ih);
-        _perspectivePixels[3] = new Point(0, ih);
-
-        UpdatePerspectiveScreenFromPixels();
+        ResetPerspectiveCorners();
     }
 
     private async void BtnPerspectiveSaveAs_Click(object sender, RoutedEventArgs e)
@@ -2190,17 +2422,35 @@ public partial class MainWindow : Window
             {
                 LoadingBadge.Visibility = Visibility.Visible;
                 bool autoEnhance = ChkPerspectiveEnhance.IsChecked == true;
+                bool autoCrop = ChkPerspectiveCrop.IsChecked == true;
 
-                await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
-                    currentPath,
-                    destPath,
-                    _perspectivePixels[0],
-                    _perspectivePixels[1],
-                    _perspectivePixels[2],
-                    _perspectivePixels[3],
-                    _rotation,
-                    _flipH,
-                    autoEnhance);
+                if (_isKeystoneMode)
+                {
+                    await ImageCorrectionService.WarpPerspectiveAndSaveAsync(
+                        currentPath,
+                        destPath,
+                        _perspectivePixels[0],
+                        _perspectivePixels[1],
+                        _perspectivePixels[2],
+                        _perspectivePixels[3],
+                        autoCrop,
+                        _rotation,
+                        _flipH,
+                        autoEnhance);
+                }
+                else
+                {
+                    await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
+                        currentPath,
+                        destPath,
+                        _perspectivePixels[0],
+                        _perspectivePixels[1],
+                        _perspectivePixels[2],
+                        _perspectivePixels[3],
+                        _rotation,
+                        _flipH,
+                        autoEnhance);
+                }
 
                 _cache.Remove(destPath);
                 ExitPerspectiveMode();
@@ -2248,17 +2498,35 @@ public partial class MainWindow : Window
         {
             LoadingBadge.Visibility = Visibility.Visible;
             bool autoEnhance = ChkPerspectiveEnhance.IsChecked == true;
+            bool autoCrop = ChkPerspectiveCrop.IsChecked == true;
 
-            await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
-                currentPath,
-                currentPath,
-                _perspectivePixels[0],
-                _perspectivePixels[1],
-                _perspectivePixels[2],
-                _perspectivePixels[3],
-                _rotation,
-                _flipH,
-                autoEnhance);
+            if (_isKeystoneMode)
+            {
+                await ImageCorrectionService.WarpPerspectiveAndSaveAsync(
+                    currentPath,
+                    currentPath,
+                    _perspectivePixels[0],
+                    _perspectivePixels[1],
+                    _perspectivePixels[2],
+                    _perspectivePixels[3],
+                    autoCrop,
+                    _rotation,
+                    _flipH,
+                    autoEnhance);
+            }
+            else
+            {
+                await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
+                    currentPath,
+                    currentPath,
+                    _perspectivePixels[0],
+                    _perspectivePixels[1],
+                    _perspectivePixels[2],
+                    _perspectivePixels[3],
+                    _rotation,
+                    _flipH,
+                    autoEnhance);
+            }
 
             _cache.Remove(currentPath);
 

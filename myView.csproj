@@ -10,7 +10,7 @@
     <AssemblyName>myView</AssemblyName>
     <Title>myView - Ultra-Fast Image Viewer</Title>
     <Product>myView</Product>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Company>myView</Company>
   </PropertyGroup>
 
