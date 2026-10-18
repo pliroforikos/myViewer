@@ -56,13 +56,15 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 
 ---
 
-## ✂️ Cropping & Editing
+## ✂️ Επεξεργασία, Περικοπή & Έγγραφα (Editing & Correction)
 
 | Shortcut | Description |
 | :--- | :--- |
-| **`C`** | Enter / Exit interactive **Crop Mode** (Περικοπή) |
-| **`Enter`** | Open **Save As...** dialog to save cropped image |
-| **`Esc`** | Cancel crop selection and return to viewer |
+| **`C`** | Enter / Exit interactive **Crop Mode** (Περικοπή εικόνας) |
+| **`E`** | Enter / Exit **Horizon Straightening Mode** (Ευθυγράμμιση Ορίζοντα & μικρο-περιστροφή) |
+| **`P`** | Enter / Exit **Perspective & Document Skew Mode** (Ίσιωμα εγγράφου από τις 4 γωνίες) |
+| **`Enter`** | Open **Save As...** dialog to save edited/straightened image (in editing mode) |
+| **`Esc`** | Cancel active edit/crop selection and return to standard viewer |
 
 ---
 

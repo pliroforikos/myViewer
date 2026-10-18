@@ -282,6 +282,16 @@
                     <Path Data="{StaticResource IconCrop}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
 
+                <!-- Straighten / Horizon Toggle -->
+                <Button x:Name="BtnHorizonToggle" Style="{StaticResource HudIconButton}" Click="BtnHorizon_Click" ToolTip="Ευθυγράμμιση Ορίζοντα / Περιστροφή (E)">
+                    <Path Data="{StaticResource IconHorizon}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
+                </Button>
+
+                <!-- Perspective / Document Skew Toggle -->
+                <Button x:Name="BtnPerspectiveToggle" Style="{StaticResource HudIconButton}" Click="BtnPerspective_Click" ToolTip="Διόρθωση Προοπτικής &amp; Skew Εγγράφου (P)">
+                    <Path Data="{StaticResource IconPerspective}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
+                </Button>
+
                 <!-- Divider -->
                 <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="6,0" />
 
@@ -664,6 +674,232 @@
             </StackPanel>
         </Border>
 
+        <!-- Horizon / Straighten Interactive Overlay -->
+        <Canvas x:Name="HorizonCanvas"
+                Visibility="Collapsed"
+                Background="Transparent"
+                ClipToBounds="True"
+                MouseDown="HorizonCanvas_MouseDown"
+                MouseMove="HorizonCanvas_MouseMove"
+                MouseUp="HorizonCanvas_MouseUp">
+
+            <!-- Full-viewport alignment grid lines -->
+            <Canvas x:Name="HorizonGridCanvas" IsHitTestVisible="False" Opacity="0.35" />
+
+            <!-- Virtual Horizon Reference Line -->
+            <Line x:Name="HorizonRefLine"
+                  Stroke="{StaticResource AccentBrush}"
+                  StrokeThickness="2"
+                  StrokeDashArray="4 2" />
+
+            <!-- Left and Right draggable horizon anchor handles -->
+            <Grid x:Name="HorizonAnchorLeft" Width="26" Height="26" Cursor="Hand" Margin="-13,-13,0,0">
+                <Ellipse Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1.5" />
+                <Ellipse Width="8" Height="8" Fill="#FFFFFF" />
+            </Grid>
+            <Grid x:Name="HorizonAnchorRight" Width="26" Height="26" Cursor="Hand" Margin="-13,-13,0,0">
+                <Ellipse Fill="{StaticResource AccentBrush}" Stroke="#000000" StrokeThickness="1.5" />
+                <Ellipse Width="8" Height="8" Fill="#FFFFFF" />
+            </Grid>
+
+            <!-- Angle readout badge floating along the line -->
+            <Border x:Name="HorizonCenterBadge"
+                    Background="#EB121218"
+                    BorderBrush="{StaticResource AccentBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="8,4"
+                    IsHitTestVisible="False"
+                    Margin="-30,-15,0,0">
+                <TextBlock x:Name="TxtHorizonCenterAngle" Text="0.0°" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+            </Border>
+        </Canvas>
+
+        <!-- Floating Horizon Toolbar -->
+        <Border x:Name="HorizonToolbar"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Background="#F013131A"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="1"
+                CornerRadius="22"
+                Padding="16,8">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="25" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.75" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Path Data="{StaticResource IconHorizon}" Fill="{StaticResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="Ορίζοντας:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                <!-- Nudge Minus -->
+                <Button Click="BtnHorizonMinus_Click" Style="{StaticResource HudIconButton}" Width="26" Height="26" ToolTip="-0.5°" Margin="0,0,4,0">
+                    <TextBlock Text="-0.5°" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+
+                <!-- Slider -->
+                <Slider x:Name="SliderHorizonAngle"
+                        Minimum="-45"
+                        Maximum="45"
+                        Value="0"
+                        Width="140"
+                        VerticalAlignment="Center"
+                        TickFrequency="0.5"
+                        IsSnapToTickEnabled="False"
+                        ValueChanged="SliderHorizonAngle_ValueChanged"
+                        Margin="0,0,4,0" />
+
+                <!-- Nudge Plus -->
+                <Button Click="BtnHorizonPlus_Click" Style="{StaticResource HudIconButton}" Width="26" Height="26" ToolTip="+0.5°" Margin="0,0,6,0">
+                    <TextBlock Text="+0.5°" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+
+                <!-- Angle display pill & Reset -->
+                <Button Click="BtnHorizonReset_Click" Background="#20202E" BorderBrush="#333346" BorderThickness="1" Padding="8,3" Cursor="Hand" ToolTip="Επαναφορά σε 0.0°" Margin="0,0,10,0">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
+                    <TextBlock x:Name="TxtHorizonAngle" Text="0.0°" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                </Button>
+
+                <!-- Auto Crop Checkbox -->
+                <CheckBox x:Name="ChkHorizonAutoCrop" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5">
+                    <TextBlock Text="Αυτόματο Crop" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                </CheckBox>
+
+                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,12,0" />
+
+                <Button Click="BtnHorizonSaveAs_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" Padding="14,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconSave}" Fill="#000000" Width="13" Height="13" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Αποθήκευση ως..." VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Click="BtnHorizonOverwrite_Click" Background="#252538" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
+                </Button>
+
+                <Button Click="BtnHorizonCancel_Click" Background="Transparent" BorderBrush="#38384C" BorderThickness="1" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Padding="12,6" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="Ακύρωση" VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Perspective / 4-Corner Document Skew Interactive Overlay -->
+        <Canvas x:Name="PerspectiveCanvas"
+                Visibility="Collapsed"
+                Background="Transparent"
+                ClipToBounds="True"
+                MouseDown="PerspectiveCanvas_MouseDown"
+                MouseMove="PerspectiveCanvas_MouseMove"
+                MouseUp="PerspectiveCanvas_MouseUp">
+
+            <!-- Dark shaded area outside the quadrilateral -->
+            <Path x:Name="PerspectiveDarkShade" Fill="#99000000" />
+
+            <!-- Perspective Guide Mesh (Lines inside the quad) -->
+            <Path x:Name="PerspectiveMeshLines" Stroke="#4000D2FF" StrokeThickness="1" StrokeDashArray="3 3" />
+
+            <!-- Polygon Border connecting the 4 corners -->
+            <Path x:Name="PerspectiveQuadBorder" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+
+            <!-- 4 Corner Draggable Handles -->
+            <!-- Top-Left (TL) -->
+            <Grid x:Name="HandleTL" Width="30" Height="30" Cursor="Cross" Margin="-15,-15,0,0">
+                <Ellipse Fill="#181824" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+                <Ellipse Width="10" Height="10" Fill="{StaticResource AccentBrush}" />
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="3,1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-2,-14,0,0">
+                    <TextBlock Text="↖ TL" FontSize="9" FontWeight="Bold" Foreground="#000000" />
+                </Border>
+            </Grid>
+
+            <!-- Top-Right (TR) -->
+            <Grid x:Name="HandleTR" Width="30" Height="30" Cursor="Cross" Margin="-15,-15,0,0">
+                <Ellipse Fill="#181824" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+                <Ellipse Width="10" Height="10" Fill="{StaticResource AccentBrush}" />
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="3,1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-14,-2,0">
+                    <TextBlock Text="TR ↗" FontSize="9" FontWeight="Bold" Foreground="#000000" />
+                </Border>
+            </Grid>
+
+            <!-- Bottom-Right (BR) -->
+            <Grid x:Name="HandleBR" Width="30" Height="30" Cursor="Cross" Margin="-15,-15,0,0">
+                <Ellipse Fill="#181824" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+                <Ellipse Width="10" Height="10" Fill="{StaticResource AccentBrush}" />
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="3,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-14">
+                    <TextBlock Text="BR ↘" FontSize="9" FontWeight="Bold" Foreground="#000000" />
+                </Border>
+            </Grid>
+
+            <!-- Bottom-Left (BL) -->
+            <Grid x:Name="HandleBL" Width="30" Height="30" Cursor="Cross" Margin="-15,-15,0,0">
+                <Ellipse Fill="#181824" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" />
+                <Ellipse Width="10" Height="10" Fill="{StaticResource AccentBrush}" />
+                <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="3,1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-2,0,0,-14">
+                    <TextBlock Text="↙ BL" FontSize="9" FontWeight="Bold" Foreground="#000000" />
+                </Border>
+            </Grid>
+        </Canvas>
+
+        <!-- Floating Perspective Toolbar -->
+        <Border x:Name="PerspectiveToolbar"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Background="#F013131A"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="1"
+                CornerRadius="22"
+                Padding="16,8">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="25" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.75" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Path Data="{StaticResource IconPerspective}" Fill="{StaticResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="Ίσιωμα Εγγράφου:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+
+                <!-- Dimensions Pill -->
+                <Border Background="#20202E" CornerRadius="8" Padding="8,3" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="TxtPerspectiveDimensions" Text="0 × 0 px" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                </Border>
+
+                <!-- Reset Corners Button -->
+                <Button Click="BtnPerspectiveReset_Click" Background="#20202E" BorderBrush="#333346" BorderThickness="1" Padding="8,4" Cursor="Hand" ToolTip="Επαναφορά γωνιών στα όρια της εικόνας" Margin="0,0,8,0">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
+                    <TextBlock Text="🔄 Επαναφορά" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+
+                <!-- Auto-enhance checkbox -->
+                <CheckBox x:Name="ChkPerspectiveEnhance" IsChecked="False" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5">
+                    <TextBlock Text="Βελτίωση Κειμένου" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                </CheckBox>
+
+                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,12,0" />
+
+                <Button Click="BtnPerspectiveSaveAs_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" Padding="14,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconSave}" Fill="#000000" Width="13" Height="13" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Αποθήκευση ως..." VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Click="BtnPerspectiveOverwrite_Click" Background="#252538" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
+                </Button>
+
+                <Button Click="BtnPerspectiveCancel_Click" Background="Transparent" BorderBrush="#38384C" BorderThickness="1" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Padding="12,6" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="Ακύρωση" VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+
         <!-- Toast Notification Badge (Auto-hiding success feedback) -->
         <Border x:Name="ToastBadge"
                 HorizontalAlignment="Center"
@@ -722,7 +958,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.3" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.0.4" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />

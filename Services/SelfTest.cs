@@ -191,10 +191,42 @@ public static class SelfTest
             allPassed = false;
         }
 
+        // 10. Test Horizon Straighten & 4-Corner Perspective Deskew
+        try
+        {
+            string jpgSrc = Path.Combine(sampleDir, "test3_landscape.jpg");
+            string straightOut = Path.Combine(sampleDir, "test_straighten_out.jpg");
+            string deskewOut = Path.Combine(sampleDir, "test_deskew_out.jpg");
+
+            // Test Straighten with auto-crop
+            await ImageCorrectionService.StraightenAndSaveAsync(jpgSrc, straightOut, angleDegrees: 3.5, autoCrop: true);
+            var loadedStraight = await ImageLoader.LoadImageAsync(straightOut);
+            Assert(loadedStraight.PixelWidth > 1700 && loadedStraight.PixelHeight > 950, $"Straightened size: {loadedStraight.PixelWidth}x{loadedStraight.PixelHeight}");
+            Log($"  [PASS] Horizon Straighten verified ({loadedStraight.DimensionsString}, angle=3.5°, auto-crop).");
+
+            // Test 4-Corner Perspective Deskew
+            var p0 = new System.Windows.Point(80, 60);    // TL
+            var p1 = new System.Windows.Point(1840, 90);   // TR
+            var p2 = new System.Windows.Point(1800, 1020); // BR
+            var p3 = new System.Windows.Point(60, 990);    // BL
+            await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(jpgSrc, deskewOut, p0, p1, p2, p3, autoEnhance: true);
+            var loadedDeskew = await ImageLoader.LoadImageAsync(deskewOut);
+            Assert(loadedDeskew.PixelWidth > 1700 && loadedDeskew.PixelHeight > 900, $"Deskewed size: {loadedDeskew.PixelWidth}x{loadedDeskew.PixelHeight}");
+            Log($"  [PASS] 4-Corner Perspective Deskew verified ({loadedDeskew.DimensionsString}, auto-enhanced).");
+
+            // Clean up temporary test files
+            try { File.Delete(straightOut); File.Delete(deskewOut); } catch { }
+        }
+        catch (Exception ex)
+        {
+            Log($"  [FAIL] Horizon & Perspective test failed: {ex.Message}");
+            allPassed = false;
+        }
+
         Log("========================================");
         if (allPassed)
         {
-            Log("   >>> ALL 9 TEST SUITES PASSED! <<<    ");
+            Log("   >>> ALL 10 TEST SUITES PASSED! <<<   ");
         }
         else
         {

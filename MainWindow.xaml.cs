@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Line = System.Windows.Shapes.Line;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using myView.Models;
@@ -51,6 +52,21 @@ public partial class MainWindow : Window
     private Point _cropDragStartPoint;
     private Rect _cropRectStart;
     private readonly DispatcherTimer _toastTimer = new();
+
+    // Horizon Straighten state
+    private bool _isHorizonMode = false;
+    private double _straightenAngle = 0.0;
+    private Point _horizonStartPt;
+    private Point _horizonEndPt;
+    private int _horizonDragMode = 0; // 0: None, 1: Left handle, 2: Right handle, 3: Drawing new line
+
+    // Perspective / 4-Corner Document Skew state
+    private bool _isPerspectiveMode = false;
+    private readonly Point[] _perspectivePixels = new Point[4]; // TL, TR, BR, BL in oriented image pixels
+    private readonly Point[] _perspectiveScreen = new Point[4]; // TL, TR, BR, BL on screen canvas
+    private int _perspectiveDragHandle = -1; // -1: None, 0: TL, 1: TR, 2: BR, 3: BL, 4: Move all
+    private Point _perspectiveDragStartPt;
+    private Point[]? _perspectiveStartScreen;
 
     // CancellationToken for current decode
     private CancellationTokenSource? _loadCts;
@@ -173,6 +189,7 @@ public partial class MainWindow : Window
         // Reset transforms
         _rotation = 0;
         _flipH = false;
+        _straightenAngle = 0.0;
         _isFitMode = true;
 
         // Check in-memory cache first (0ms latency!)
@@ -214,10 +231,9 @@ public partial class MainWindow : Window
 
     private void ApplyLoadedImage(LoadedImageData data)
     {
-        if (_isCropMode)
-        {
-            ExitCropMode();
-        }
+        if (_isCropMode) ExitCropMode();
+        if (_isHorizonMode) ExitHorizonMode();
+        if (_isPerspectiveMode) ExitPerspectiveMode();
 
         _currentData = data;
         DisplayImage.Source = data.ImageSource;
@@ -401,9 +417,10 @@ public partial class MainWindow : Window
         if (_flipH)
             matrix.Scale(-1.0, 1.0);
 
-        // 3. Rotate around center
-        if (_rotation != 0)
-            matrix.Rotate(_rotation);
+        // 3. Rotate around center (including fine horizon angle)
+        double totalRot = _rotation + _straightenAngle;
+        if (Math.Abs(totalRot) > 0.0001)
+            matrix.Rotate(totalRot);
 
         // 4. Scale around center
         matrix.Scale(_scale, _scale);
@@ -418,6 +435,14 @@ public partial class MainWindow : Window
         if (_isCropMode)
         {
             UpdateCropScreenFromPixels();
+        }
+        else if (_isPerspectiveMode)
+        {
+            UpdatePerspectiveScreenFromPixels();
+        }
+        else if (_isHorizonMode)
+        {
+            UpdateHorizonUi();
         }
     }
 
@@ -494,6 +519,15 @@ public partial class MainWindow : Window
         {
             UpdateCropScreenFromPixels();
         }
+        else if (_isPerspectiveMode)
+        {
+            UpdatePerspectiveScreenFromPixels();
+        }
+        else if (_isHorizonMode)
+        {
+            DrawHorizonGrid();
+            UpdateHorizonUi();
+        }
     }
 
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -505,6 +539,15 @@ public partial class MainWindow : Window
         else if (_isCropMode)
         {
             UpdateCropScreenFromPixels();
+        }
+        else if (_isPerspectiveMode)
+        {
+            UpdatePerspectiveScreenFromPixels();
+        }
+        else if (_isHorizonMode)
+        {
+            DrawHorizonGrid();
+            UpdateHorizonUi();
         }
     }
 
@@ -527,6 +570,36 @@ public partial class MainWindow : Window
             else if (e.Key == Key.Enter)
             {
                 BtnCropSaveAs_Click(sender, e);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (_isHorizonMode)
+        {
+            if (e.Key == Key.Escape || e.Key == Key.E)
+            {
+                ExitHorizonMode();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                BtnHorizonSaveAs_Click(sender, e);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (_isPerspectiveMode)
+        {
+            if (e.Key == Key.Escape || e.Key == Key.P)
+            {
+                ExitPerspectiveMode();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                BtnPerspectiveSaveAs_Click(sender, e);
                 e.Handled = true;
             }
             return;
@@ -629,6 +702,16 @@ public partial class MainWindow : Window
 
             case Key.C:
                 ToggleCropMode();
+                e.Handled = true;
+                break;
+
+            case Key.E:
+                ToggleHorizonMode();
+                e.Handled = true;
+                break;
+
+            case Key.P:
+                TogglePerspectiveMode();
                 e.Handled = true;
                 break;
 
@@ -1476,6 +1559,730 @@ public partial class MainWindow : Window
         ToastBadge.Visibility = Visibility.Visible;
         _toastTimer.Stop();
         _toastTimer.Start();
+    }
+
+    #endregion
+
+    #region Horizon & Straighten Operations
+
+    private void BtnHorizon_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleHorizonMode();
+    }
+
+    private void ToggleHorizonMode()
+    {
+        if (_isHorizonMode)
+            ExitHorizonMode();
+        else
+            EnterHorizonMode();
+    }
+
+    private void EnterHorizonMode()
+    {
+        if (_currentData == null) return;
+
+        ExitCropMode();
+        ExitPerspectiveMode();
+
+        _isHorizonMode = true;
+
+        BottomHudBar.Visibility = Visibility.Collapsed;
+        ExifSidebar.Visibility = Visibility.Collapsed;
+
+        HorizonCanvas.Visibility = Visibility.Visible;
+        HorizonToolbar.Visibility = Visibility.Visible;
+
+        SliderHorizonAngle.Value = _straightenAngle;
+        TxtHorizonAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
+        TxtHorizonCenterAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
+
+        double vw = ViewportBorder.ActualWidth > 0 ? ViewportBorder.ActualWidth : 800;
+        double vh = ViewportBorder.ActualHeight > 0 ? ViewportBorder.ActualHeight : 600;
+
+        _horizonStartPt = new Point(vw * 0.25, vh * 0.5);
+        _horizonEndPt = new Point(vw * 0.75, vh * 0.5);
+
+        DrawHorizonGrid();
+        UpdateHorizonUi();
+    }
+
+    private void ExitHorizonMode()
+    {
+        _isHorizonMode = false;
+        _horizonDragMode = 0;
+        HorizonCanvas.ReleaseMouseCapture();
+
+        _straightenAngle = 0.0;
+        ApplyTransforms();
+
+        HorizonCanvas.Visibility = Visibility.Collapsed;
+        HorizonToolbar.Visibility = Visibility.Collapsed;
+        BottomHudBar.Visibility = Visibility.Visible;
+        RevealHud();
+    }
+
+    private void DrawHorizonGrid()
+    {
+        HorizonGridCanvas.Children.Clear();
+        double w = ViewportBorder.ActualWidth;
+        double h = ViewportBorder.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+
+        var brush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
+        brush.Freeze();
+
+        for (double y = 45; y < h; y += 45)
+        {
+            var line = new Line
+            {
+                X1 = 0, Y1 = y, X2 = w, Y2 = y,
+                Stroke = brush,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 4, 4 }
+            };
+            HorizonGridCanvas.Children.Add(line);
+        }
+
+        for (double x = 45; x < w; x += 45)
+        {
+            var line = new Line
+            {
+                X1 = x, Y1 = 0, X2 = x, Y2 = h,
+                Stroke = brush,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 4, 4 }
+            };
+            HorizonGridCanvas.Children.Add(line);
+        }
+    }
+
+    private void UpdateHorizonUi()
+    {
+        if (!_isHorizonMode) return;
+
+        HorizonRefLine.X1 = _horizonStartPt.X;
+        HorizonRefLine.Y1 = _horizonStartPt.Y;
+        HorizonRefLine.X2 = _horizonEndPt.X;
+        HorizonRefLine.Y2 = _horizonEndPt.Y;
+
+        Canvas.SetLeft(HorizonAnchorLeft, _horizonStartPt.X);
+        Canvas.SetTop(HorizonAnchorLeft, _horizonStartPt.Y);
+
+        Canvas.SetLeft(HorizonAnchorRight, _horizonEndPt.X);
+        Canvas.SetTop(HorizonAnchorRight, _horizonEndPt.Y);
+
+        double midX = (_horizonStartPt.X + _horizonEndPt.X) / 2.0;
+        double midY = (_horizonStartPt.Y + _horizonEndPt.Y) / 2.0;
+
+        Canvas.SetLeft(HorizonCenterBadge, midX);
+        Canvas.SetTop(HorizonCenterBadge, midY);
+
+        TxtHorizonCenterAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
+        TxtHorizonAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
+    }
+
+    private void SliderHorizonAngle_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_isHorizonMode) return;
+        _straightenAngle = Math.Round(SliderHorizonAngle.Value, 1);
+        UpdateHorizonUi();
+        ApplyTransforms();
+    }
+
+    private void BtnHorizonMinus_Click(object sender, RoutedEventArgs e)
+    {
+        SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value - 0.5, 1), -45.0, 45.0);
+    }
+
+    private void BtnHorizonPlus_Click(object sender, RoutedEventArgs e)
+    {
+        SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + 0.5, 1), -45.0, 45.0);
+    }
+
+    private void BtnHorizonReset_Click(object sender, RoutedEventArgs e)
+    {
+        SliderHorizonAngle.Value = 0.0;
+    }
+
+    private void HorizonCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+
+        Point pt = e.GetPosition(HorizonCanvas);
+
+        double distLeft = Math.Sqrt(Math.Pow(pt.X - _horizonStartPt.X, 2) + Math.Pow(pt.Y - _horizonStartPt.Y, 2));
+        double distRight = Math.Sqrt(Math.Pow(pt.X - _horizonEndPt.X, 2) + Math.Pow(pt.Y - _horizonEndPt.Y, 2));
+
+        if (distLeft <= 25)
+        {
+            _horizonDragMode = 1; // Left handle
+        }
+        else if (distRight <= 25)
+        {
+            _horizonDragMode = 2; // Right handle
+        }
+        else
+        {
+            _horizonDragMode = 3; // Drawing new line
+            _horizonStartPt = pt;
+            _horizonEndPt = pt;
+        }
+
+        HorizonCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void HorizonCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_horizonDragMode == 0) return;
+
+        Point pt = e.GetPosition(HorizonCanvas);
+
+        if (_horizonDragMode == 1)
+        {
+            _horizonStartPt = pt;
+        }
+        else if (_horizonDragMode == 2)
+        {
+            _horizonEndPt = pt;
+        }
+        else if (_horizonDragMode == 3)
+        {
+            _horizonEndPt = pt;
+        }
+
+        double dx = _horizonEndPt.X - _horizonStartPt.X;
+        double dy = _horizonEndPt.Y - _horizonStartPt.Y;
+        double dist = Math.Sqrt(dx * dx + dy * dy);
+
+        if (dist >= 15)
+        {
+            double rad = Math.Atan2(dy, dx);
+            double deg = rad * (180.0 / Math.PI);
+
+            // Normalize reference line orientation to horizontal/vertical
+            while (deg > 45) deg -= 90;
+            while (deg < -45) deg += 90;
+
+            // Invert angle because rotating counter-clockwise levels the slope
+            double angle = Math.Clamp(-deg, -45.0, 45.0);
+            SliderHorizonAngle.Value = Math.Round(angle, 1);
+        }
+        else
+        {
+            UpdateHorizonUi();
+        }
+
+        e.Handled = true;
+    }
+
+    private void HorizonCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_horizonDragMode != 0)
+        {
+            _horizonDragMode = 0;
+            HorizonCanvas.ReleaseMouseCapture();
+            e.Handled = true;
+        }
+    }
+
+    private async void BtnHorizonSaveAs_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+
+        string currentPath = item.FilePath;
+        string currentDir = Path.GetDirectoryName(currentPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        string fileNameWithoutExt = Path.GetFileNameWithoutExtension(currentPath);
+        string currentExt = Path.GetExtension(currentPath).ToLowerInvariant();
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "myView - Αποθήκευση Ευθυγραμμισμένης Εικόνας",
+            InitialDirectory = currentDir,
+            FileName = $"{fileNameWithoutExt}_straightened{currentExt}",
+            Filter = "JPEG Image (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG Image (*.png)|*.png|WebP Image (*.webp)|*.webp|BMP Image (*.bmp)|*.bmp|All Files (*.*)|*.*",
+            DefaultExt = currentExt
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            string destPath = dlg.FileName;
+            try
+            {
+                LoadingBadge.Visibility = Visibility.Visible;
+                bool autoCrop = ChkHorizonAutoCrop.IsChecked == true;
+                double angle = _straightenAngle;
+
+                await ImageCorrectionService.StraightenAndSaveAsync(currentPath, destPath, angle, autoCrop, _rotation, _flipH);
+
+                _cache.Remove(destPath);
+                ExitHorizonMode();
+
+                string destDir = Path.GetDirectoryName(destPath) ?? "";
+                if (string.Equals(currentDir, destDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    _folderNav.LoadFolder(destDir, destPath);
+                }
+                else
+                {
+                    OpenSpecificFile(destPath);
+                }
+
+                ShowToast("✓ Η εικόνα ευθυγραμμίστηκε και αποθηκεύτηκε!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Σφάλμα κατά την αποθήκευση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async void BtnHorizonOverwrite_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+
+        string currentPath = item.FilePath;
+        string fileName = Path.GetFileName(currentPath);
+
+        var result = MessageBox.Show(
+            $"Είστε βέβαιοι ότι θέλετε να αντικαταστήσετε το αρχικό αρχείο;\n\n{fileName}\n\nΗ ενέργεια αυτή θα αποθηκεύσει την ευθυγραμμισμένη εικόνα πάνω στο αρχικό αρχείο.",
+            "Επιβεβαίωση Αντικατάστασης - myView",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            LoadingBadge.Visibility = Visibility.Visible;
+            bool autoCrop = ChkHorizonAutoCrop.IsChecked == true;
+            double angle = _straightenAngle;
+
+            await ImageCorrectionService.StraightenAndSaveAsync(currentPath, currentPath, angle, autoCrop, _rotation, _flipH);
+
+            _cache.Remove(currentPath);
+
+            _rotation = 0;
+            _flipH = false;
+            _straightenAngle = 0.0;
+
+            ExitHorizonMode();
+
+            await DisplayImageItemAsync(item);
+            ShowToast("✓ Η εικόνα ενημερώθηκε επιτυχώς!");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Σφάλμα κατά την αντικατάσταση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            LoadingBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void BtnHorizonCancel_Click(object sender, RoutedEventArgs e)
+    {
+        ExitHorizonMode();
+    }
+
+    #endregion
+
+    #region Perspective & Document Skew Operations
+
+    private void BtnPerspective_Click(object sender, RoutedEventArgs e)
+    {
+        TogglePerspectiveMode();
+    }
+
+    private void TogglePerspectiveMode()
+    {
+        if (_isPerspectiveMode)
+            ExitPerspectiveMode();
+        else
+            EnterPerspectiveMode();
+    }
+
+    private void EnterPerspectiveMode()
+    {
+        if (_currentData == null) return;
+
+        ExitCropMode();
+        ExitHorizonMode();
+
+        GetOrientedDimensions(out double iw, out double ih);
+        if (iw <= 0 || ih <= 0) return;
+
+        _isPerspectiveMode = true;
+
+        BottomHudBar.Visibility = Visibility.Collapsed;
+        ExifSidebar.Visibility = Visibility.Collapsed;
+
+        PerspectiveCanvas.Visibility = Visibility.Visible;
+        PerspectiveToolbar.Visibility = Visibility.Visible;
+
+        // Default: 4 corner pins with 6% margin from image bounds
+        _perspectivePixels[0] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.06)); // TL
+        _perspectivePixels[1] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.06)); // TR
+        _perspectivePixels[2] = new Point(Math.Round(iw * 0.94), Math.Round(ih * 0.94)); // BR
+        _perspectivePixels[3] = new Point(Math.Round(iw * 0.06), Math.Round(ih * 0.94)); // BL
+
+        UpdatePerspectiveScreenFromPixels();
+    }
+
+    private void ExitPerspectiveMode()
+    {
+        _isPerspectiveMode = false;
+        _perspectiveDragHandle = -1;
+        PerspectiveCanvas.ReleaseMouseCapture();
+
+        PerspectiveCanvas.Visibility = Visibility.Collapsed;
+        PerspectiveToolbar.Visibility = Visibility.Collapsed;
+        BottomHudBar.Visibility = Visibility.Visible;
+        RevealHud();
+    }
+
+    private void UpdatePerspectiveScreenFromPixels()
+    {
+        if (!_isPerspectiveMode || _currentData == null) return;
+
+        for (int i = 0; i < 4; i++)
+        {
+            _perspectiveScreen[i] = ImageToScreen(_perspectivePixels[i]);
+        }
+
+        UpdatePerspectiveUi();
+    }
+
+    private void UpdatePerspectivePixelsFromScreen()
+    {
+        GetOrientedDimensions(out double iw, out double ih);
+
+        for (int i = 0; i < 4; i++)
+        {
+            Point pt = ScreenToImage(_perspectiveScreen[i]);
+            _perspectivePixels[i] = new Point(
+                Math.Clamp(Math.Round(pt.X), 0, iw),
+                Math.Clamp(Math.Round(pt.Y), 0, ih));
+        }
+
+        UpdatePerspectiveUi();
+    }
+
+    private void UpdatePerspectiveUi()
+    {
+        if (!_isPerspectiveMode || _currentData == null) return;
+
+        double vw = ViewportBorder.ActualWidth;
+        double vh = ViewportBorder.ActualHeight;
+        if (vw <= 0 || vh <= 0) return;
+
+        // 1. Position the 4 handles
+        Canvas.SetLeft(HandleTL, _perspectiveScreen[0].X); Canvas.SetTop(HandleTL, _perspectiveScreen[0].Y);
+        Canvas.SetLeft(HandleTR, _perspectiveScreen[1].X); Canvas.SetTop(HandleTR, _perspectiveScreen[1].Y);
+        Canvas.SetLeft(HandleBR, _perspectiveScreen[2].X); Canvas.SetTop(HandleBR, _perspectiveScreen[2].Y);
+        Canvas.SetLeft(HandleBL, _perspectiveScreen[3].X); Canvas.SetTop(HandleBL, _perspectiveScreen[3].Y);
+
+        // 2. Dark shaded inverted background
+        var shadeGeom = new PathGeometry { FillRule = FillRule.EvenOdd };
+        var figVw = new PathFigure { StartPoint = new Point(0, 0), IsClosed = true };
+        figVw.Segments.Add(new LineSegment(new Point(vw, 0), false));
+        figVw.Segments.Add(new LineSegment(new Point(vw, vh), false));
+        figVw.Segments.Add(new LineSegment(new Point(0, vh), false));
+        shadeGeom.Figures.Add(figVw);
+
+        var figQuad = new PathFigure { StartPoint = _perspectiveScreen[0], IsClosed = true };
+        figQuad.Segments.Add(new LineSegment(_perspectiveScreen[1], false));
+        figQuad.Segments.Add(new LineSegment(_perspectiveScreen[2], false));
+        figQuad.Segments.Add(new LineSegment(_perspectiveScreen[3], false));
+        shadeGeom.Figures.Add(figQuad);
+        PerspectiveDarkShade.Data = shadeGeom;
+
+        // 3. Quad border line
+        var borderGeom = new PathGeometry();
+        var borderFig = new PathFigure { StartPoint = _perspectiveScreen[0], IsClosed = true };
+        borderFig.Segments.Add(new LineSegment(_perspectiveScreen[1], true));
+        borderFig.Segments.Add(new LineSegment(_perspectiveScreen[2], true));
+        borderFig.Segments.Add(new LineSegment(_perspectiveScreen[3], true));
+        borderGeom.Figures.Add(borderFig);
+        PerspectiveQuadBorder.Data = borderGeom;
+
+        // 4. Perspective Mesh grid lines (1/3 and 2/3)
+        var meshGeom = new PathGeometry();
+        Point p0 = _perspectiveScreen[0], p1 = _perspectiveScreen[1], p2 = _perspectiveScreen[2], p3 = _perspectiveScreen[3];
+
+        double[] fracs = { 1.0 / 3.0, 2.0 / 3.0 };
+        foreach (double f in fracs)
+        {
+            // Vertical-like line
+            Point top = new Point(p0.X + (p1.X - p0.X) * f, p0.Y + (p1.Y - p0.Y) * f);
+            Point bot = new Point(p3.X + (p2.X - p3.X) * f, p3.Y + (p2.Y - p3.Y) * f);
+            var vFig = new PathFigure { StartPoint = top, IsClosed = false };
+            vFig.Segments.Add(new LineSegment(bot, true));
+            meshGeom.Figures.Add(vFig);
+
+            // Horizontal-like line
+            Point left = new Point(p0.X + (p3.X - p0.X) * f, p0.Y + (p3.Y - p0.Y) * f);
+            Point right = new Point(p1.X + (p2.X - p1.X) * f, p1.Y + (p2.Y - p1.Y) * f);
+            var hFig = new PathFigure { StartPoint = left, IsClosed = false };
+            hFig.Segments.Add(new LineSegment(right, true));
+            meshGeom.Figures.Add(hFig);
+        }
+        PerspectiveMeshLines.Data = meshGeom;
+
+        // 5. Output dimensions estimate
+        double w1 = Math.Sqrt(Math.Pow(_perspectivePixels[1].X - _perspectivePixels[0].X, 2) + Math.Pow(_perspectivePixels[1].Y - _perspectivePixels[0].Y, 2));
+        double w2 = Math.Sqrt(Math.Pow(_perspectivePixels[2].X - _perspectivePixels[3].X, 2) + Math.Pow(_perspectivePixels[2].Y - _perspectivePixels[3].Y, 2));
+        int estW = (int)Math.Round(Math.Max(w1, w2));
+
+        double h1 = Math.Sqrt(Math.Pow(_perspectivePixels[3].X - _perspectivePixels[0].X, 2) + Math.Pow(_perspectivePixels[3].Y - _perspectivePixels[0].Y, 2));
+        double h2 = Math.Sqrt(Math.Pow(_perspectivePixels[2].X - _perspectivePixels[1].X, 2) + Math.Pow(_perspectivePixels[2].Y - _perspectivePixels[1].Y, 2));
+        int estH = (int)Math.Round(Math.Max(h1, h2));
+
+        TxtPerspectiveDimensions.Text = $"{estW} × {estH} px";
+    }
+
+    private int GetPerspectiveHitTestHandle(Point pt)
+    {
+        double tol = 24.0;
+        for (int i = 0; i < 4; i++)
+        {
+            double d = Math.Sqrt(Math.Pow(pt.X - _perspectiveScreen[i].X, 2) + Math.Pow(pt.Y - _perspectiveScreen[i].Y, 2));
+            if (d <= tol) return i;
+        }
+
+        if (IsPointInsidePolygon(pt, _perspectiveScreen))
+            return 4; // Move all
+
+        return -1;
+    }
+
+    private static bool IsPointInsidePolygon(Point pt, Point[] poly)
+    {
+        bool inside = false;
+        for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+        {
+            if (((poly[i].Y > pt.Y) != (poly[j].Y > pt.Y)) &&
+                (pt.X < (poly[j].X - poly[i].X) * (pt.Y - poly[i].Y) / (poly[j].Y - poly[i].Y) + poly[i].X))
+            {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    private void PerspectiveCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+
+        Point pt = e.GetPosition(PerspectiveCanvas);
+        _perspectiveDragHandle = GetPerspectiveHitTestHandle(pt);
+        _perspectiveDragStartPt = pt;
+        _perspectiveStartScreen = (Point[])_perspectiveScreen.Clone();
+
+        if (_perspectiveDragHandle != -1)
+        {
+            PerspectiveCanvas.CaptureMouse();
+            e.Handled = true;
+        }
+    }
+
+    private void PerspectiveCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        Point pt = e.GetPosition(PerspectiveCanvas);
+
+        if (_perspectiveDragHandle == -1)
+        {
+            int h = GetPerspectiveHitTestHandle(pt);
+            PerspectiveCanvas.Cursor = h switch
+            {
+                0 or 1 or 2 or 3 => Cursors.Cross,
+                4 => Cursors.SizeAll,
+                _ => Cursors.Arrow
+            };
+            return;
+        }
+
+        GetOrientedDimensions(out double iw, out double ih);
+
+        if (_perspectiveDragHandle >= 0 && _perspectiveDragHandle < 4)
+        {
+            Point imgPt = ScreenToImage(pt);
+            imgPt.X = Math.Clamp(Math.Round(imgPt.X), 0, iw);
+            imgPt.Y = Math.Clamp(Math.Round(imgPt.Y), 0, ih);
+            _perspectivePixels[_perspectiveDragHandle] = imgPt;
+            _perspectiveScreen[_perspectiveDragHandle] = ImageToScreen(imgPt);
+            UpdatePerspectiveUi();
+        }
+        else if (_perspectiveDragHandle == 4 && _perspectiveStartScreen != null)
+        {
+            double dx = pt.X - _perspectiveDragStartPt.X;
+            double dy = pt.Y - _perspectiveDragStartPt.Y;
+
+            for (int i = 0; i < 4; i++)
+            {
+                Point newScr = new Point(_perspectiveStartScreen[i].X + dx, _perspectiveStartScreen[i].Y + dy);
+                Point imgPt = ScreenToImage(newScr);
+                imgPt.X = Math.Clamp(Math.Round(imgPt.X), 0, iw);
+                imgPt.Y = Math.Clamp(Math.Round(imgPt.Y), 0, ih);
+                _perspectivePixels[i] = imgPt;
+                _perspectiveScreen[i] = ImageToScreen(imgPt);
+            }
+            UpdatePerspectiveUi();
+        }
+
+        e.Handled = true;
+    }
+
+    private void PerspectiveCanvas_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_perspectiveDragHandle != -1)
+        {
+            _perspectiveDragHandle = -1;
+            PerspectiveCanvas.ReleaseMouseCapture();
+            e.Handled = true;
+        }
+    }
+
+    private void BtnPerspectiveReset_Click(object sender, RoutedEventArgs e)
+    {
+        GetOrientedDimensions(out double iw, out double ih);
+        if (iw <= 0 || ih <= 0) return;
+
+        _perspectivePixels[0] = new Point(0, 0);
+        _perspectivePixels[1] = new Point(iw, 0);
+        _perspectivePixels[2] = new Point(iw, ih);
+        _perspectivePixels[3] = new Point(0, ih);
+
+        UpdatePerspectiveScreenFromPixels();
+    }
+
+    private async void BtnPerspectiveSaveAs_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+
+        string currentPath = item.FilePath;
+        string currentDir = Path.GetDirectoryName(currentPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        string fileNameWithoutExt = Path.GetFileNameWithoutExtension(currentPath);
+        string currentExt = Path.GetExtension(currentPath).ToLowerInvariant();
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "myView - Αποθήκευση Ισιωμένου Εγγράφου",
+            InitialDirectory = currentDir,
+            FileName = $"{fileNameWithoutExt}_scanned{currentExt}",
+            Filter = "JPEG Image (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG Image (*.png)|*.png|WebP Image (*.webp)|*.webp|BMP Image (*.bmp)|*.bmp|All Files (*.*)|*.*",
+            DefaultExt = currentExt
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            string destPath = dlg.FileName;
+            try
+            {
+                LoadingBadge.Visibility = Visibility.Visible;
+                bool autoEnhance = ChkPerspectiveEnhance.IsChecked == true;
+
+                await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
+                    currentPath,
+                    destPath,
+                    _perspectivePixels[0],
+                    _perspectivePixels[1],
+                    _perspectivePixels[2],
+                    _perspectivePixels[3],
+                    _rotation,
+                    _flipH,
+                    autoEnhance);
+
+                _cache.Remove(destPath);
+                ExitPerspectiveMode();
+
+                string destDir = Path.GetDirectoryName(destPath) ?? "";
+                if (string.Equals(currentDir, destDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    _folderNav.LoadFolder(destDir, destPath);
+                }
+                else
+                {
+                    OpenSpecificFile(destPath);
+                }
+
+                ShowToast("✓ Το έγγραφο ισιώθηκε και αποθηκεύτηκε!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Σφάλμα κατά την αποθήκευση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async void BtnPerspectiveOverwrite_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+
+        string currentPath = item.FilePath;
+        string fileName = Path.GetFileName(currentPath);
+
+        var result = MessageBox.Show(
+            $"Είστε βέβαιοι ότι θέλετε να αντικαταστήσετε το αρχικό αρχείο;\n\n{fileName}\n\nΗ ενέργεια αυτή θα ισιώσει το έγγραφο και θα το αποθηκεύσει πάνω στο αρχικό αρχείο.",
+            "Επιβεβαίωση Αντικατάστασης - myView",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            LoadingBadge.Visibility = Visibility.Visible;
+            bool autoEnhance = ChkPerspectiveEnhance.IsChecked == true;
+
+            await ImageCorrectionService.DeskewPerspectiveAndSaveAsync(
+                currentPath,
+                currentPath,
+                _perspectivePixels[0],
+                _perspectivePixels[1],
+                _perspectivePixels[2],
+                _perspectivePixels[3],
+                _rotation,
+                _flipH,
+                autoEnhance);
+
+            _cache.Remove(currentPath);
+
+            _rotation = 0;
+            _flipH = false;
+
+            ExitPerspectiveMode();
+
+            await DisplayImageItemAsync(item);
+            ShowToast("✓ Το έγγραφο ενημερώθηκε επιτυχώς!");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Σφάλμα κατά την αντικατάσταση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            LoadingBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void BtnPerspectiveCancel_Click(object sender, RoutedEventArgs e)
+    {
+        ExitPerspectiveMode();
     }
 
     #endregion
