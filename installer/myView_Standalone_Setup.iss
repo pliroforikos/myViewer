@@ -2,7 +2,7 @@
 ; Inno Setup 6 Script
 
 #define MyAppName "myView"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "Λέων Προκόπης (plarg.gr)"
 #define MyAppURL "https://plarg.gr"
 #define MyAppExeName "myView.exe"
@@ -23,7 +23,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\LICENSE
 OutputDir=..\dist
-OutputBaseFilename=myView-v1.1.0-setup
+OutputBaseFilename=myView-v1.1.1-setup
 SetupIconFile=..\app.ico
 Compression=lzma2/max
 SolidCompression=yes

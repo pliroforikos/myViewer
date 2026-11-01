@@ -56,9 +56,12 @@ public partial class MainWindow : Window
     // Horizon Straighten state
     private bool _isHorizonMode = false;
     private double _straightenAngle = 0.0;
-    private Point _horizonStartPt;
-    private Point _horizonEndPt;
-    private int _horizonDragMode = 0; // 0: None, 1: Left handle, 2: Right handle, 3: Drawing new line
+    private double _horizonLineY = -1; // Vertical Y position of the horizontal reference line
+    private double _horizonBadgeX = -1; // Horizontal X position of the center badge
+    private bool _isDraggingHorizon = false;
+    private Point _dragStartMousePt;
+    private double _dragStartLineY;
+    private double _dragStartBadgeX;
 
     // Perspective / 4-Corner Document Skew state
     private bool _isPerspectiveMode = false;
@@ -80,7 +83,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _loadCts;
 
     // Auto-update state
-    private const string CurrentAppVersion = "1.1.0";
+    private const string CurrentAppVersion = "1.1.1";
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _downloadCts;
 
@@ -472,6 +475,15 @@ public partial class MainWindow : Window
 
     private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (_isHorizonMode)
+        {
+            double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 0.5 : 0.1;
+            double delta = e.Delta > 0 ? step : -step;
+            SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + delta, 1), -45.0, 45.0);
+            e.Handled = true;
+            return;
+        }
+
         Point mousePos = e.GetPosition(ViewportBorder);
         double factor = e.Delta > 0 ? 1.15 : (1.0 / 1.15);
         ZoomAtPoint(mousePos, factor);
@@ -624,6 +636,37 @@ public partial class MainWindow : Window
             else if (e.Key == Key.Enter)
             {
                 BtnHorizonSaveAs_Click(sender, e);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 10.0 : 1.0;
+                _horizonLineY -= step;
+                UpdateHorizonUi();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 10.0 : 1.0;
+                _horizonLineY += step;
+                UpdateHorizonUi();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Left)
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 0.5 : 0.1;
+                SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value - step, 1), -45.0, 45.0);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Right)
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 0.5 : 0.1;
+                SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + step, 1), -45.0, 45.0);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.R || e.Key == Key.D0 || e.Key == Key.NumPad0)
+            {
+                SliderHorizonAngle.Value = 0.0;
                 e.Handled = true;
             }
             return;
@@ -2190,17 +2233,22 @@ public partial class MainWindow : Window
         double vw = ViewportBorder.ActualWidth > 0 ? ViewportBorder.ActualWidth : 800;
         double vh = ViewportBorder.ActualHeight > 0 ? ViewportBorder.ActualHeight : 600;
 
-        _horizonStartPt = new Point(vw * 0.25, vh * 0.5);
-        _horizonEndPt = new Point(vw * 0.75, vh * 0.5);
+        _horizonLineY = vh * 0.5;
+        _horizonBadgeX = vw * 0.5;
+        _isDraggingHorizon = false;
 
-        DrawHorizonGrid();
+        HorizonGridCanvas.Visibility = ChkHorizonShowGrid.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        if (ChkHorizonShowGrid.IsChecked == true)
+        {
+            DrawHorizonGrid();
+        }
         UpdateHorizonUi();
     }
 
     private void ExitHorizonMode()
     {
         _isHorizonMode = false;
-        _horizonDragMode = 0;
+        _isDraggingHorizon = false;
         HorizonCanvas.ReleaseMouseCapture();
 
         _straightenAngle = 0.0;
@@ -2215,11 +2263,13 @@ public partial class MainWindow : Window
     private void DrawHorizonGrid()
     {
         HorizonGridCanvas.Children.Clear();
+        if (ChkHorizonShowGrid.IsChecked != true) return;
+
         double w = ViewportBorder.ActualWidth;
         double h = ViewportBorder.ActualHeight;
         if (w <= 0 || h <= 0) return;
 
-        var brush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
+        var brush = new SolidColorBrush(Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF));
         brush.Freeze();
 
         for (double y = 45; y < h; y += 45)
@@ -2247,26 +2297,53 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ChkHorizonShowGrid_Changed(object sender, RoutedEventArgs e)
+    {
+        if (HorizonGridCanvas == null) return;
+        bool show = ChkHorizonShowGrid.IsChecked == true;
+        HorizonGridCanvas.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show)
+        {
+            DrawHorizonGrid();
+        }
+    }
+
     private void UpdateHorizonUi()
     {
         if (!_isHorizonMode) return;
 
-        HorizonRefLine.X1 = _horizonStartPt.X;
-        HorizonRefLine.Y1 = _horizonStartPt.Y;
-        HorizonRefLine.X2 = _horizonEndPt.X;
-        HorizonRefLine.Y2 = _horizonEndPt.Y;
+        double vw = ViewportBorder.ActualWidth > 0 ? ViewportBorder.ActualWidth : 800;
+        double vh = ViewportBorder.ActualHeight > 0 ? ViewportBorder.ActualHeight : 600;
 
-        Canvas.SetLeft(HorizonAnchorLeft, _horizonStartPt.X);
-        Canvas.SetTop(HorizonAnchorLeft, _horizonStartPt.Y);
+        if (_horizonLineY < 0) _horizonLineY = vh * 0.5;
+        if (_horizonBadgeX < 0) _horizonBadgeX = vw * 0.5;
 
-        Canvas.SetLeft(HorizonAnchorRight, _horizonEndPt.X);
-        Canvas.SetTop(HorizonAnchorRight, _horizonEndPt.Y);
+        _horizonLineY = Math.Clamp(_horizonLineY, 5, vh - 5);
+        _horizonBadgeX = Math.Clamp(_horizonBadgeX, 50, vw - 50);
 
-        double midX = (_horizonStartPt.X + _horizonEndPt.X) / 2.0;
-        double midY = (_horizonStartPt.Y + _horizonEndPt.Y) / 2.0;
+        // Keep reference line 100% strictly horizontal across the full width
+        HorizonRefLineShadow.X1 = 0;
+        HorizonRefLineShadow.Y1 = _horizonLineY;
+        HorizonRefLineShadow.X2 = vw;
+        HorizonRefLineShadow.Y2 = _horizonLineY;
 
-        Canvas.SetLeft(HorizonCenterBadge, midX);
-        Canvas.SetTop(HorizonCenterBadge, midY);
+        HorizonRefLine.X1 = 0;
+        HorizonRefLine.Y1 = _horizonLineY;
+        HorizonRefLine.X2 = vw;
+        HorizonRefLine.Y2 = _horizonLineY;
+
+        double handleSpan = Math.Min(300, vw * 0.35);
+        double leftX = Math.Max(25, _horizonBadgeX - handleSpan);
+        double rightX = Math.Min(vw - 25, _horizonBadgeX + handleSpan);
+
+        Canvas.SetLeft(HorizonAnchorLeft, leftX);
+        Canvas.SetTop(HorizonAnchorLeft, _horizonLineY);
+
+        Canvas.SetLeft(HorizonAnchorRight, rightX);
+        Canvas.SetTop(HorizonAnchorRight, _horizonLineY);
+
+        Canvas.SetLeft(HorizonCenterBadge, _horizonBadgeX);
+        Canvas.SetTop(HorizonCenterBadge, _horizonLineY);
 
         TxtHorizonCenterAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
         TxtHorizonAngle.Text = $"{_straightenAngle:+0.0;-0.0;0.0}°";
@@ -2285,6 +2362,16 @@ public partial class MainWindow : Window
         SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value - 0.5, 1), -45.0, 45.0);
     }
 
+    private void BtnHorizonMinusFine_Click(object sender, RoutedEventArgs e)
+    {
+        SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value - 0.1, 1), -45.0, 45.0);
+    }
+
+    private void BtnHorizonPlusFine_Click(object sender, RoutedEventArgs e)
+    {
+        SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + 0.1, 1), -45.0, 45.0);
+    }
+
     private void BtnHorizonPlus_Click(object sender, RoutedEventArgs e)
     {
         SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + 0.5, 1), -45.0, 45.0);
@@ -2300,81 +2387,65 @@ public partial class MainWindow : Window
         if (e.ChangedButton != MouseButton.Left) return;
 
         Point pt = e.GetPosition(HorizonCanvas);
+        _isDraggingHorizon = true;
+        _dragStartMousePt = pt;
+        _dragStartLineY = _horizonLineY;
+        _dragStartBadgeX = _horizonBadgeX;
 
-        double distLeft = Math.Sqrt(Math.Pow(pt.X - _horizonStartPt.X, 2) + Math.Pow(pt.Y - _horizonStartPt.Y, 2));
-        double distRight = Math.Sqrt(Math.Pow(pt.X - _horizonEndPt.X, 2) + Math.Pow(pt.Y - _horizonEndPt.Y, 2));
-
-        if (distLeft <= 25)
+        // If clicking far from the line, snap the line Y directly to the clicked point!
+        if (Math.Abs(pt.Y - _horizonLineY) > 25)
         {
-            _horizonDragMode = 1; // Left handle
-        }
-        else if (distRight <= 25)
-        {
-            _horizonDragMode = 2; // Right handle
-        }
-        else
-        {
-            _horizonDragMode = 3; // Drawing new line
-            _horizonStartPt = pt;
-            _horizonEndPt = pt;
+            _horizonLineY = pt.Y;
+            _dragStartLineY = pt.Y;
+            if (Math.Abs(pt.X - _horizonBadgeX) > 150)
+            {
+                _horizonBadgeX = pt.X;
+                _dragStartBadgeX = pt.X;
+            }
         }
 
+        UpdateHorizonUi();
         HorizonCanvas.CaptureMouse();
         e.Handled = true;
     }
 
     private void HorizonCanvas_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_horizonDragMode == 0) return;
-
         Point pt = e.GetPosition(HorizonCanvas);
 
-        if (_horizonDragMode == 1)
+        if (_isDraggingHorizon)
         {
-            _horizonStartPt = pt;
-        }
-        else if (_horizonDragMode == 2)
-        {
-            _horizonEndPt = pt;
-        }
-        else if (_horizonDragMode == 3)
-        {
-            _horizonEndPt = pt;
-        }
+            double dy = pt.Y - _dragStartMousePt.Y;
+            double dx = pt.X - _dragStartMousePt.X;
 
-        double dx = _horizonEndPt.X - _horizonStartPt.X;
-        double dy = _horizonEndPt.Y - _horizonStartPt.Y;
-        double dist = Math.Sqrt(dx * dx + dy * dy);
+            _horizonLineY = _dragStartLineY + dy;
+            _horizonBadgeX = _dragStartBadgeX + dx;
 
-        if (dist >= 15)
-        {
-            double rad = Math.Atan2(dy, dx);
-            double deg = rad * (180.0 / Math.PI);
-
-            // Normalize reference line orientation to horizontal/vertical
-            while (deg > 45) deg -= 90;
-            while (deg < -45) deg += 90;
-
-            // Invert angle because rotating counter-clockwise levels the slope
-            double angle = Math.Clamp(-deg, -45.0, 45.0);
-            SliderHorizonAngle.Value = Math.Round(angle, 1);
-        }
-        else
-        {
             UpdateHorizonUi();
+            e.Handled = true;
+            return;
         }
 
-        e.Handled = true;
+        double distY = Math.Abs(pt.Y - _horizonLineY);
+        HorizonCanvas.Cursor = distY <= 25 ? Cursors.SizeNS : Cursors.Hand;
     }
 
     private void HorizonCanvas_MouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (_horizonDragMode != 0)
+        if (_isDraggingHorizon)
         {
-            _horizonDragMode = 0;
+            _isDraggingHorizon = false;
             HorizonCanvas.ReleaseMouseCapture();
             e.Handled = true;
         }
+    }
+
+    private void HorizonCanvas_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        double step = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift ? 0.5 : 0.1;
+        double delta = e.Delta > 0 ? step : -step;
+        SliderHorizonAngle.Value = Math.Clamp(Math.Round(SliderHorizonAngle.Value + delta, 1), -45.0, 45.0);
+        e.Handled = true;
     }
 
     private async void BtnHorizonSaveAs_Click(object sender, RoutedEventArgs e)
