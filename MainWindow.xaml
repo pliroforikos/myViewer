@@ -184,6 +184,7 @@
                         <MenuItem Header="✂️ Περικοπή (Crop)" InputGestureText="C" Click="BtnCrop_Click" />
                         <MenuItem Header="📐 Ίσιωμα Ορίζοντα" InputGestureText="E" Click="BtnHorizon_Click" />
                         <MenuItem Header="📐 Προοπτική &amp; Skew" InputGestureText="P" Click="BtnPerspective_Click" />
+                        <MenuItem Header="🩹 Αφαίρεση Ατελειών (Healing Spot)" InputGestureText="J" Click="BtnHealing_Click" />
                         <Separator />
                         <MenuItem Header="🔄 Περιστροφή Δεξιά 90°" InputGestureText="R" Click="BtnRotateRight_Click" />
                         <MenuItem Header="🔄 Περιστροφή Αριστερά 90°" InputGestureText="L" Click="BtnRotateLeft_Click" />
@@ -345,6 +346,11 @@
                 <!-- Perspective / Document Skew Toggle -->
                 <Button x:Name="BtnPerspectiveToggle" Style="{StaticResource HudIconButton}" Click="BtnPerspective_Click" ToolTip="Διόρθωση Προοπτικής &amp; Skew Εγγράφου (P)">
                     <Path Data="{StaticResource IconPerspective}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
+                </Button>
+
+                <!-- Spot Healing Toggle -->
+                <Button x:Name="BtnHealingToggle" Style="{StaticResource HudIconButton}" Click="BtnHealing_Click" ToolTip="Spot Healing / Αφαίρεση Ατελειών (J)">
+                    <Path Data="{StaticResource IconHealing}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
 
                 <!-- Divider -->
@@ -1031,6 +1037,131 @@
             </StackPanel>
         </Border>
 
+        <!-- Spot Healing (Blemish Remover) Interactive Overlay -->
+        <Canvas x:Name="HealingCanvas"
+                Visibility="Collapsed"
+                Background="Transparent"
+                ClipToBounds="True"
+                MouseDown="HealingCanvas_MouseDown"
+                MouseMove="HealingCanvas_MouseMove"
+                MouseLeave="HealingCanvas_MouseLeave"
+                MouseWheel="HealingCanvas_MouseWheel"
+                Cursor="Cross">
+
+            <!-- Dynamic brush cursor circle following mouse -->
+            <Ellipse x:Name="HealingBrushCursor"
+                     Width="50" Height="50"
+                     Stroke="{StaticResource AccentBrush}"
+                     StrokeThickness="1.5"
+                     StrokeDashArray="3 2"
+                     Fill="#2500D2FF"
+                     IsHitTestVisible="False"
+                     Visibility="Collapsed" />
+
+            <!-- Animated pulse rings container for healed spots -->
+            <Canvas x:Name="HealingPulseCanvas" IsHitTestVisible="False" />
+        </Canvas>
+
+        <!-- Floating Spot Healing Toolbar -->
+        <Border x:Name="HealingToolbar"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Background="#F0383838"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="1"
+                CornerRadius="22"
+                Padding="16,8">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="25" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.75" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Path Data="{StaticResource IconHealing}" Fill="{StaticResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="Healing Spot:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                <!-- Brush Size Slider -->
+                <TextBlock Text="Μέγεθος:" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Button Click="BtnHealingBrushDec_Click" Style="{StaticResource HudIconButton}" Width="22" Height="22" ToolTip="Μείωση διαμέτρου πινέλου ([)" Margin="0,0,3,0">
+                    <TextBlock Text="-" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+                <Slider x:Name="SliderHealingBrush"
+                        Minimum="5"
+                        Maximum="100"
+                        Value="25"
+                        Width="90"
+                        SmallChange="1"
+                        LargeChange="5"
+                        VerticalAlignment="Center"
+                        ValueChanged="SliderHealingBrush_ValueChanged"
+                        Margin="0,0,3,0" />
+                <Button Click="BtnHealingBrushInc_Click" Style="{StaticResource HudIconButton}" Width="22" Height="22" ToolTip="Αύξηση διαμέτρου πινέλου (])" Margin="0,0,6,0">
+                    <TextBlock Text="+" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+                <Border Background="#484848" CornerRadius="6" Padding="6,2" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="TxtHealingBrushValue" Text="25 px" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" MinWidth="34" TextAlignment="Center" />
+                </Border>
+
+                <!-- Quick Size Preset Chips -->
+                <Border Background="#484848" CornerRadius="8" Padding="2" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnPreset15" Click="BtnHealingSizePreset_Click" Tag="15" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Padding="6,2" Cursor="Hand" ToolTip="Μικρή διάμετρος 15px">
+                            <TextBlock Text="15px" />
+                        </Button>
+                        <Button x:Name="BtnPreset25" Click="BtnHealingSizePreset_Click" Tag="25" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="10.5" Padding="6,2" Cursor="Hand" ToolTip="Μεσαία διάμετρος 25px">
+                            <TextBlock Text="25px" />
+                        </Button>
+                        <Button x:Name="BtnPreset45" Click="BtnHealingSizePreset_Click" Tag="45" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" Padding="6,2" Cursor="Hand" ToolTip="Μεγάλη διάμετρος 45px">
+                            <TextBlock Text="45px" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Spots Count Pill -->
+                <Border Background="#484848" CornerRadius="8" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtHealingCount" Text="0 σημεία" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Border>
+
+                <!-- Undo Button -->
+                <Button x:Name="BtnHealingUndo" Click="BtnHealingUndo_Click" IsEnabled="False" Background="#484848" BorderBrush="#5A5A5A" BorderThickness="1" Padding="8,4" Cursor="Hand" ToolTip="Αναίρεση τελευταίας διόρθωσης (Ctrl+Z)" Margin="0,0,8,0">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconUndo}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="12" Height="12" Stretch="Uniform" Margin="0,0,5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Αναίρεση" FontSize="11" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Before/After Peek Button -->
+                <Button x:Name="BtnHealingPeek" PreviewMouseDown="BtnHealingPeek_MouseDown" PreviewMouseUp="BtnHealingPeek_MouseUp" Background="#484848" BorderBrush="#5A5A5A" BorderThickness="1" Padding="8,4" Cursor="Hand" ToolTip="Κρατήστε πατημένο για προβολή αρχικής εικόνας (ή πλήκτρο Space)" Margin="0,0,10,0">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
+                    <TextBlock Text="👁️ Πριν / Μετά" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                </Button>
+
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="0,0,10,0" />
+
+                <!-- Save As -->
+                <Button Click="BtnHealingSaveAs_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" Padding="14,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconSave}" Fill="#000000" Width="13" Height="13" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Αποθήκευση ως..." VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Overwrite -->
+                <Button Click="BtnHealingOverwrite_Click" Background="#444444" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
+                </Button>
+
+                <!-- Cancel -->
+                <Button Click="BtnHealingCancel_Click" Background="Transparent" BorderBrush="#38384C" BorderThickness="1" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Padding="12,6" Cursor="Hand">
+                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
+                    <TextBlock Text="Ακύρωση" VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+
         <!-- Toast Notification Badge (Auto-hiding success feedback) -->
         <Border x:Name="ToastBadge"
                 HorizontalAlignment="Center"
@@ -1089,7 +1220,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                                 <Border Background="#484848" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.1.1" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="v1.2.0" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                                 <Border x:Name="BadgeUpdateStatus" Background="#14281E" BorderBrush="#10B981" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
                                     <TextBlock x:Name="TxtBadgeUpdateStatus" Text="✓ Τελευταία έκδοση" FontSize="10" FontWeight="SemiBold" Foreground="#10B981" />

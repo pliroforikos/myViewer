@@ -67,6 +67,11 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | **`←` / `→` (in Horizon)** | Micro-rotate angle by $\pm 0.1^\circ$ (or $\pm 0.5^\circ$ with Shift) |
 | **`0` / `R` (in Horizon)** | Reset rotation angle to $0.0^\circ$ |
 | **`P`** | Enter / Exit **Perspective & Keystone Mode** (Διόρθωση προοπτικής & άνοιγμα γωνιών εγγράφου) |
+| **`J`** | Enter / Exit **Spot Healing Mode** (Αφαίρεση Ατελειών, σπυράκια, κηλίδες, σημάδια) |
+| **`[` / `]` (in Healing)** | Μείωση / Αύξηση διαμέτρου πινέλου διόρθωσης (Decrease / Increase Brush Size) |
+| **`Mouse Wheel` (in Healing)** | Ρύθμιση διαμέτρου πινέλου διόρθωσης (Change Brush Radius) |
+| **`Ctrl + Z` (in Healing)** | Αναίρεση τελευταίου σημείου διόρθωσης (Undo Last Spot Heal) |
+| **`Space` (in Healing)** | Προσωρινή προβολή αρχικής εικόνας (Πριν / Μετά) |
 | **`Enter`** | Open **Save As...** dialog to save edited/straightened image (in editing mode) |
 | **`Esc`** | Cancel active edit/crop selection and return to standard viewer |
 

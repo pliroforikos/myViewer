@@ -79,11 +79,21 @@ public partial class MainWindow : Window
     private bool _perspectivePreviewDirty = false;
     private bool _suppressKeystoneSliderEvent = false;
 
+    // Spot Healing (Blemish Remover) state
+    private bool _isHealingMode = false;
+    private int _healingBrushRadius = 25;
+    private WriteableBitmap? _healingWorkingBitmap;
+    private ImageSource? _healingOriginalSource;
+    private readonly List<SpotRecord> _healingSpots = new();
+    private readonly Stack<SpotUndoRecord> _healingUndoStack = new();
+    private bool _suppressHealingSliderEvent = false;
+    private bool _isPeekingOriginal = false;
+
     // CancellationToken for current decode
     private CancellationTokenSource? _loadCts;
 
     // Auto-update state
-    private const string CurrentAppVersion = "1.1.1";
+    private const string CurrentAppVersion = "1.2.0";
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _downloadCts;
 
@@ -92,6 +102,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _perspectivePreviewTimer.Tick += PerspectivePreviewTimer_Tick;
+        KeyUp += Window_KeyUp;
 
         _folderNav.SelectionChanged += FolderNav_SelectionChanged;
         _folderNav.FolderReloaded += FolderNav_FolderReloaded;
@@ -261,6 +272,7 @@ public partial class MainWindow : Window
         if (_isCropMode) ExitCropMode();
         if (_isHorizonMode) ExitHorizonMode();
         if (_isPerspectiveMode) ExitPerspectiveMode();
+        if (_isHealingMode) ExitHealingMode(discard: true);
 
         _currentData = data;
         DisplayImage.Source = data.ImageSource;
@@ -471,6 +483,10 @@ public partial class MainWindow : Window
         {
             UpdateHorizonUi();
         }
+        else if (_isHealingMode)
+        {
+            UpdateHealingCursorFromCurrentMouse();
+        }
     }
 
     private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -608,6 +624,46 @@ public partial class MainWindow : Window
                 CopyImageToClipboard();
             }
             e.Handled = true;
+            return;
+        }
+
+        if (_isHealingMode)
+        {
+            if (e.Key == Key.Escape || e.Key == Key.J)
+            {
+                ExitHealingMode(discard: true);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                BtnHealingSaveAs_Click(sender, e);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Z && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                UndoLastHeal();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Space)
+            {
+                if (!_isPeekingOriginal)
+                {
+                    _isPeekingOriginal = true;
+                    if (_healingOriginalSource != null)
+                        DisplayImage.Source = _healingOriginalSource;
+                }
+                e.Handled = true;
+            }
+            else if (e.Key == Key.OemOpenBrackets)
+            {
+                ChangeHealingBrushRadius(-5);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.OemCloseBrackets)
+            {
+                ChangeHealingBrushRadius(5);
+                e.Handled = true;
+            }
             return;
         }
 
@@ -833,6 +889,11 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
 
+            case Key.J:
+                ToggleHealingMode();
+                e.Handled = true;
+                break;
+
             case Key.F11:
                 ToggleFullscreen();
                 RevealHud();
@@ -894,7 +955,7 @@ public partial class MainWindow : Window
     private void Window_TextInput(object sender, TextCompositionEventArgs e)
     {
         if (TxtTagSearch.IsFocused) return;
-        if (_isCropMode || _isHorizonMode || _isPerspectiveMode) return;
+        if (_isCropMode || _isHorizonMode || _isPerspectiveMode || _isHealingMode) return;
         if (DeleteConfirmOverlay.Visibility == Visibility.Visible ||
             UpdateOverlay.Visibility == Visibility.Visible ||
             AboutOverlay.Visibility == Visibility.Visible) return;
@@ -1742,6 +1803,8 @@ public partial class MainWindow : Window
     {
         if (_currentData == null) return;
 
+        ExitHealingMode(discard: true);
+
         GetOrientedDimensions(out double imgW, out double imgH);
         if (imgW <= 0 || imgH <= 0) return;
 
@@ -2217,6 +2280,7 @@ public partial class MainWindow : Window
 
         ExitCropMode();
         ExitPerspectiveMode();
+        ExitHealingMode(discard: true);
 
         _isHorizonMode = true;
 
@@ -2577,6 +2641,7 @@ public partial class MainWindow : Window
 
         ExitCropMode();
         ExitHorizonMode();
+        ExitHealingMode(discard: true);
 
         GetOrientedDimensions(out double iw, out double ih);
         if (iw <= 0 || ih <= 0) return;
@@ -3247,6 +3312,370 @@ public partial class MainWindow : Window
         if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         if (bytes < 1024 * 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):F2} MB";
         return $"{bytes / (1024.0 * 1024.0 * 1024.0):F2} GB";
+    }
+
+    #endregion
+
+    private void Window_KeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space && _isHealingMode && _isPeekingOriginal)
+        {
+            _isPeekingOriginal = false;
+            if (_healingWorkingBitmap != null)
+                DisplayImage.Source = _healingWorkingBitmap;
+            e.Handled = true;
+        }
+    }
+
+    #region Spot Healing (Blemish & Artifact Remover)
+
+    private void ToggleHealingMode()
+    {
+        if (_isHealingMode)
+            ExitHealingMode(discard: true);
+        else
+            EnterHealingMode();
+    }
+
+    private void EnterHealingMode()
+    {
+        if (_currentData == null || DisplayImage.Source == null) return;
+
+        if (_isCropMode) ExitCropMode();
+        if (_isHorizonMode) ExitHorizonMode();
+        if (_isPerspectiveMode) ExitPerspectiveMode();
+
+        _isHealingMode = true;
+        _healingOriginalSource = DisplayImage.Source;
+
+        // Convert current image to 32-bit BGRA WriteableBitmap for fast in-place editing
+        if (DisplayImage.Source is BitmapSource bs)
+        {
+            var formatted = new FormatConvertedBitmap(bs, PixelFormats.Bgra32, null, 0);
+            _healingWorkingBitmap = new WriteableBitmap(formatted);
+            DisplayImage.Source = _healingWorkingBitmap;
+        }
+
+        _healingSpots.Clear();
+        _healingUndoStack.Clear();
+
+        BottomHudBar.Visibility = Visibility.Collapsed;
+        HealingCanvas.Visibility = Visibility.Visible;
+        HealingToolbar.Visibility = Visibility.Visible;
+
+        _suppressHealingSliderEvent = true;
+        SliderHealingBrush.Value = _healingBrushRadius;
+        TxtHealingBrushValue.Text = $"{_healingBrushRadius} px";
+        _suppressHealingSliderEvent = false;
+
+        UpdateHealingToolbarUi();
+        UpdateHealingCursorFromCurrentMouse();
+    }
+
+    private void ExitHealingMode(bool discard = true)
+    {
+        if (!_isHealingMode) return;
+
+        if (discard && _healingOriginalSource != null)
+        {
+            DisplayImage.Source = _healingOriginalSource;
+        }
+
+        _isHealingMode = false;
+        _isPeekingOriginal = false;
+        _healingWorkingBitmap = null;
+        _healingOriginalSource = null;
+        _healingSpots.Clear();
+        _healingUndoStack.Clear();
+
+        HealingCanvas.Visibility = Visibility.Collapsed;
+        HealingToolbar.Visibility = Visibility.Collapsed;
+        BottomHudBar.Visibility = Visibility.Visible;
+        RevealHud();
+    }
+
+    private void BtnHealing_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleHealingMode();
+    }
+
+    private void HealingCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isHealingMode) return;
+        Point scrPt = e.GetPosition(HealingCanvas);
+        UpdateHealingCursor(scrPt);
+    }
+
+    private void HealingCanvas_MouseLeave(object sender, MouseEventArgs e)
+    {
+        HealingBrushCursor.Visibility = Visibility.Collapsed;
+    }
+
+    private void HealingCanvas_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isHealingMode || _healingWorkingBitmap == null || _isPeekingOriginal) return;
+
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            Point scrPt = e.GetPosition(HealingCanvas);
+            Point imgPt = ScreenToImage(scrPt);
+
+            int imgX = (int)Math.Round(imgPt.X);
+            int imgY = (int)Math.Round(imgPt.Y);
+
+            var undoRecord = HealingService.ApplySpotHeal(_healingWorkingBitmap, imgX, imgY, _healingBrushRadius);
+            if (undoRecord != null)
+            {
+                _healingUndoStack.Push(undoRecord);
+                _healingSpots.Add(new SpotRecord(imgX, imgY, _healingBrushRadius));
+                UpdateHealingToolbarUi();
+                ShowHealingPulse(scrPt, _healingBrushRadius * _scale);
+            }
+        }
+    }
+
+    private void HealingCanvas_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!_isHealingMode) return;
+        int delta = e.Delta > 0 ? 3 : -3;
+        ChangeHealingBrushRadius(delta);
+        Point scrPt = e.GetPosition(HealingCanvas);
+        UpdateHealingCursor(scrPt);
+        e.Handled = true;
+    }
+
+    private void ChangeHealingBrushRadius(int delta)
+    {
+        _healingBrushRadius = Math.Clamp(_healingBrushRadius + delta, 5, 100);
+        _suppressHealingSliderEvent = true;
+        SliderHealingBrush.Value = _healingBrushRadius;
+        TxtHealingBrushValue.Text = $"{_healingBrushRadius} px";
+        _suppressHealingSliderEvent = false;
+
+        UpdatePresetButtonsStyle();
+        UpdateHealingCursorFromCurrentMouse();
+    }
+
+    private void SliderHealingBrush_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressHealingSliderEvent || !_isHealingMode) return;
+        _healingBrushRadius = (int)Math.Round(SliderHealingBrush.Value);
+        TxtHealingBrushValue.Text = $"{_healingBrushRadius} px";
+        UpdatePresetButtonsStyle();
+        UpdateHealingCursorFromCurrentMouse();
+    }
+
+    private void BtnHealingBrushDec_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeHealingBrushRadius(-5);
+    }
+
+    private void BtnHealingBrushInc_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeHealingBrushRadius(5);
+    }
+
+    private void BtnHealingSizePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string tagStr && int.TryParse(tagStr, out int radius))
+        {
+            _healingBrushRadius = radius;
+            _suppressHealingSliderEvent = true;
+            SliderHealingBrush.Value = _healingBrushRadius;
+            TxtHealingBrushValue.Text = $"{_healingBrushRadius} px";
+            _suppressHealingSliderEvent = false;
+
+            UpdatePresetButtonsStyle();
+            UpdateHealingCursorFromCurrentMouse();
+        }
+    }
+
+    private void UpdatePresetButtonsStyle()
+    {
+        if (BtnPreset15 == null || BtnPreset25 == null || BtnPreset45 == null) return;
+
+        SetPresetButtonStyle(BtnPreset15, _healingBrushRadius == 15);
+        SetPresetButtonStyle(BtnPreset25, _healingBrushRadius == 25);
+        SetPresetButtonStyle(BtnPreset45, _healingBrushRadius == 45);
+    }
+
+    private void SetPresetButtonStyle(Button btn, bool active)
+    {
+        btn.Background = active ? (Brush)FindResource("AccentBrush") : Brushes.Transparent;
+        btn.Foreground = active ? Brushes.Black : (Brush)FindResource("TextSecondaryBrush");
+        btn.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
+    }
+
+    private void UpdateHealingCursor(Point scrPt)
+    {
+        double scrRadius = _healingBrushRadius * _scale;
+        double diameter = scrRadius * 2.0;
+
+        Canvas.SetLeft(HealingBrushCursor, scrPt.X - scrRadius);
+        Canvas.SetTop(HealingBrushCursor, scrPt.Y - scrRadius);
+        HealingBrushCursor.Width = diameter;
+        HealingBrushCursor.Height = diameter;
+        HealingBrushCursor.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateHealingCursorFromCurrentMouse()
+    {
+        if (!_isHealingMode || HealingCanvas.Visibility != Visibility.Visible) return;
+        Point scrPt = Mouse.GetPosition(HealingCanvas);
+        if (scrPt.X >= 0 && scrPt.X <= HealingCanvas.ActualWidth &&
+            scrPt.Y >= 0 && scrPt.Y <= HealingCanvas.ActualHeight)
+        {
+            UpdateHealingCursor(scrPt);
+        }
+    }
+
+    private void ShowHealingPulse(Point scrCenter, double scrRadius)
+    {
+        var ring = new System.Windows.Shapes.Ellipse
+        {
+            Width = scrRadius * 2,
+            Height = scrRadius * 2,
+            Stroke = (Brush)FindResource("AccentBrush"),
+            StrokeThickness = 2.0,
+            Opacity = 0.9,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(ring, scrCenter.X - scrRadius);
+        Canvas.SetTop(ring, scrCenter.Y - scrRadius);
+        HealingPulseCanvas.Children.Add(ring);
+
+        var anim = new System.Windows.Media.Animation.DoubleAnimation(0.9, 0.0, TimeSpan.FromMilliseconds(350));
+        anim.Completed += (s, e) => HealingPulseCanvas.Children.Remove(ring);
+        ring.BeginAnimation(UIElement.OpacityProperty, anim);
+    }
+
+    private void UpdateHealingToolbarUi()
+    {
+        BtnHealingUndo.IsEnabled = _healingUndoStack.Count > 0;
+        int count = _healingSpots.Count;
+        TxtHealingCount.Text = count == 1 ? "1 σημείο" : $"{count} σημεία";
+    }
+
+    private void UndoLastHeal()
+    {
+        if (_healingUndoStack.Count > 0 && _healingWorkingBitmap != null)
+        {
+            var record = _healingUndoStack.Pop();
+            HealingService.ApplyUndo(_healingWorkingBitmap, record);
+
+            if (_healingSpots.Count > 0)
+            {
+                _healingSpots.RemoveAt(_healingSpots.Count - 1);
+            }
+
+            UpdateHealingToolbarUi();
+            ShowToast("↩️ Αναίρεση τελευταίας διόρθωσης");
+        }
+    }
+
+    private void BtnHealingUndo_Click(object sender, RoutedEventArgs e)
+    {
+        UndoLastHeal();
+    }
+
+    private void BtnHealingPeek_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isHealingMode || _healingOriginalSource == null) return;
+        _isPeekingOriginal = true;
+        DisplayImage.Source = _healingOriginalSource;
+    }
+
+    private void BtnHealingPeek_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isHealingMode || _healingWorkingBitmap == null) return;
+        _isPeekingOriginal = false;
+        DisplayImage.Source = _healingWorkingBitmap;
+    }
+
+    private async void BtnHealingSaveAs_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+        string srcPath = item.FilePath;
+        string dir = Path.GetDirectoryName(srcPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        string nameWithoutExt = Path.GetFileNameWithoutExtension(srcPath);
+        string ext = Path.GetExtension(srcPath).ToLowerInvariant();
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Αποθήκευση εικόνας με αφαίρεση ατελειών",
+            InitialDirectory = dir,
+            FileName = $"{nameWithoutExt}_healed{ext}",
+            Filter = "JPEG Image (*.jpg)|*.jpg|PNG Image (*.png)|*.png|WebP Image (*.webp)|*.webp|BMP Image (*.bmp)|*.bmp|Όλα τα αρχεία (*.*)|*.*",
+            DefaultExt = ext
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            string destPath = dialog.FileName;
+            try
+            {
+                LoadingBadge.Visibility = Visibility.Visible;
+                await HealingService.SaveHealedImageAsync(srcPath, destPath, _healingSpots, _rotation, _flipH);
+                ExitHealingMode(discard: false);
+
+                string destDir = Path.GetDirectoryName(destPath) ?? dir;
+                _folderNav.LoadFolder(destDir, destPath);
+                if (_folderNav.CurrentItem != null)
+                {
+                    await DisplayImageItemAsync(_folderNav.CurrentItem);
+                }
+                ShowToast("✓ Η εικόνα αποθηκεύτηκε επιτυχώς!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Σφάλμα κατά την αποθήκευση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private async void BtnHealingOverwrite_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null || _currentData == null) return;
+        string srcPath = item.FilePath;
+        string fileName = Path.GetFileName(srcPath);
+
+        var result = MessageBox.Show(
+            $"Είστε βέβαιοι ότι θέλετε να αντικαταστήσετε το αρχικό αρχείο;\n\n{fileName}\n\nΗ ενέργεια δεν μπορεί να αναιρεθεί.",
+            "myView — Επιβεβαίωση Αντικατάστασης",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            try
+            {
+                LoadingBadge.Visibility = Visibility.Visible;
+                await HealingService.SaveHealedImageAsync(srcPath, srcPath, _healingSpots, _rotation, _flipH);
+                _cache.Remove(srcPath);
+                ExitHealingMode(discard: false);
+                await DisplayImageItemAsync(item);
+                ShowToast("✓ Το αρχείο αντικαταστάθηκε επιτυχώς!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Σφάλμα κατά την αντικατάσταση:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                LoadingBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void BtnHealingCancel_Click(object sender, RoutedEventArgs e)
+    {
+        ExitHealingMode(discard: true);
     }
 
     #endregion
