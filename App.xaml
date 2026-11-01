@@ -3,13 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <!-- Color Palette -->
-        <Color x:Key="BgDarkColor">#0D0D11</Color>
-        <Color x:Key="PanelBgColor">#E616161D</Color>
-        <Color x:Key="PanelBorderColor">#2E2E3C</Color>
+        <Color x:Key="BgDarkColor">#262626</Color>
+        <Color x:Key="PanelBgColor">#F0383838</Color>
+        <Color x:Key="PanelBorderColor">#535353</Color>
         <Color x:Key="AccentColor">#00D2FF</Color>
         <Color x:Key="AccentHoverColor">#33DDFF</Color>
         <Color x:Key="TextPrimaryColor">#F3F4F6</Color>
-        <Color x:Key="TextSecondaryColor">#9CA3AF</Color>
+        <Color x:Key="TextSecondaryColor">#B5B5B5</Color>
 
         <SolidColorBrush x:Key="BgDarkBrush" Color="{StaticResource BgDarkColor}" />
         <SolidColorBrush x:Key="PanelBgBrush" Color="{StaticResource PanelBgColor}" />

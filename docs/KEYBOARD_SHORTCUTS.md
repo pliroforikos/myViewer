@@ -27,8 +27,8 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | **`Mouse Wheel Down`** | Zoom Out centered at cursor position |
 | **`+` / `=`** | Zoom In centered at viewport center |
 | **`-`** | Zoom Out centered at viewport center |
-| **`F` / `0`** | **Fit to Screen** (scales image to fit window) |
-| **`1`** | **1:1 Native Size** (100% pixel mapping) |
+| **`F` / `0` / `/`** | **Fit to Screen** (scales image to fit window, preserving aspect ratio) |
+| **`1` / `*`** | **1:1 Native Size** (100% pixel mapping) |
 | **`Double-Click`** | Toggle between Fit to Screen and 1:1 Native Size |
 | **`Left-Click + Drag`** | Pan freely across the image canvas |
 
@@ -50,9 +50,9 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | :--- | :--- |
 | **`S`** | Cycle sorting modes: Name Ascending (`A-Z`) → Name Descending (`Z-A`) → Date Modified (`Newest`) → Date Modified (`Oldest`) → File Size (`Largest`) → File Size (`Smallest`) |
 | **`I`** | Toggle collapsible **EXIF & Metadata Sidebar** |
-| **`F1`** | Open / Close **About (Περί)** dialog with creator info & license |
+| **`F1`** | Open / Close **About (Περί)** dialog with creator info, license & settings |
 | **`F11`** | Toggle borderless **Fullscreen** mode |
-| **`Esc`** | Cancel Crop mode, dismiss About dialog, EXIF sidebar, or exit Fullscreen |
+| **`Esc`** | Exit Application (Quit) / Dismiss About dialog, EXIF sidebar, or cancel editing mode |
 
 ---
 
@@ -76,5 +76,7 @@ Comprehensive quick reference for navigation, transformations, metadata, and vie
 | **`Ctrl + Shift + C`** | **Αντιγραφή Διαδρομής Αρχείου (Copy File Path)** στο Clipboard |
 | **`Right-Click`** | Άνοιγμα **Μενού Επιλογών (Context Menu)** με όλες τις βασικές λειτουργίες |
 | **`Ctrl + O` / `O`** | Open File dialog |
-| **`Delete`** | Delete currently active image file (with confirmation dialog) |
+| **`Delete`** | Delete currently active image file (with confirmation or directly according to user setting) |
+| **`Shift + Delete`** | Immediate file deletion without confirmation dialog |
+| **`Esc`** | Exit / Close application (Quit) |
 | **`Drag & Drop`** | Drag any image file or directory from Windows Explorer directly onto the app |

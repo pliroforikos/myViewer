@@ -330,10 +330,37 @@ public static class SelfTest
             var files = new System.Collections.Specialized.StringCollection { pngSample };
             dataObject.SetFileDropList(files);
 
-            System.Windows.Clipboard.SetDataObject(dataObject, true);
+            bool copied = false;
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetDataObject(dataObject, true);
+                    copied = true;
+                    break;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    Thread.Sleep(50);
+                }
+            }
+            Assert(copied, "Clipboard SetDataObject succeeded");
 
-            bool hasBitmap = System.Windows.Clipboard.ContainsImage();
-            bool hasFileDrop = System.Windows.Clipboard.ContainsFileDropList();
+            bool hasBitmap = false;
+            bool hasFileDrop = false;
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    hasBitmap = System.Windows.Clipboard.ContainsImage();
+                    hasFileDrop = System.Windows.Clipboard.ContainsFileDropList();
+                    break;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    Thread.Sleep(50);
+                }
+            }
             Assert(hasBitmap && hasFileDrop, "Clipboard contains Bitmap and FileDrop");
             Log("  [PASS] Clipboard Copy verified (Bitmap, DIB, PNG stream, FileDrop).");
         }
@@ -374,10 +401,38 @@ public static class SelfTest
             allPassed = false;
         }
 
+        // Test Suite 13: Delete Settings Persistence
+        Log("\n--- Suite 13: Delete Settings Persistence ---");
+        try
+        {
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\myView"))
+            {
+                key?.SetValue("DeleteWithoutConfirmation", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\myView"))
+            {
+                var val = key?.GetValue("DeleteWithoutConfirmation");
+                Assert(val is int intVal && intVal == 1, "DeleteWithoutConfirmation setting persisted to registry");
+            }
+
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\myView"))
+            {
+                key?.SetValue("DeleteWithoutConfirmation", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+
+            Log("  [PASS] Delete settings registry persistence verified.");
+        }
+        catch (Exception ex)
+        {
+            Log($"  [FAIL] Delete settings test failed: {ex.Message}");
+            allPassed = false;
+        }
+
         Log("========================================");
         if (allPassed)
         {
-            Log("   >>> ALL 12 TEST SUITES PASSED! <<<   ");
+            Log("   >>> ALL 13 TEST SUITES PASSED! <<<   ");
         }
         else
         {

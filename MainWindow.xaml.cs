@@ -80,7 +80,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _loadCts;
 
     // Auto-update state
-    private const string CurrentAppVersion = "1.0.9";
+    private const string CurrentAppVersion = "1.1.0";
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _downloadCts;
 
@@ -113,6 +113,8 @@ public partial class MainWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        LoadSettings();
+
         // Check command-line arguments
         string[] args = Environment.GetCommandLineArgs();
         if (args.Length > 1 && File.Exists(args[1]))
@@ -642,6 +644,21 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (DeleteConfirmOverlay.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape)
+            {
+                DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                BtnConfirmDelete_Click(sender, e);
+                e.Handled = true;
+            }
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Right:
@@ -691,6 +708,8 @@ public partial class MainWindow : Window
             case Key.F:
             case Key.D0:
             case Key.NumPad0:
+            case Key.Divide:
+            case Key.OemQuestion:
                 FitToScreen();
                 RevealHud();
                 e.Handled = true;
@@ -698,9 +717,28 @@ public partial class MainWindow : Window
 
             case Key.D1:
             case Key.NumPad1:
+            case Key.Multiply:
                 NativeSize();
                 RevealHud();
                 e.Handled = true;
+                break;
+
+            case Key.D7:
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                {
+                    FitToScreen();
+                    RevealHud();
+                    e.Handled = true;
+                }
+                break;
+
+            case Key.D8:
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                {
+                    NativeSize();
+                    RevealHud();
+                    e.Handled = true;
+                }
                 break;
 
             case Key.R:
@@ -767,7 +805,7 @@ public partial class MainWindow : Window
                 break;
 
             case Key.Delete:
-                PromptDeleteCurrent();
+                PromptDeleteCurrent(forceNoConfirm: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
                 e.Handled = true;
                 break;
 
@@ -785,7 +823,11 @@ public partial class MainWindow : Window
                 break;
 
             case Key.Escape:
-                if (UpdateOverlay.Visibility == Visibility.Visible)
+                if (DeleteConfirmOverlay.Visibility == Visibility.Visible)
+                {
+                    DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+                }
+                else if (UpdateOverlay.Visibility == Visibility.Visible)
                 {
                     BtnCloseUpdate_Click(sender, e);
                 }
@@ -797,12 +839,34 @@ public partial class MainWindow : Window
                 {
                     ExifSidebar.Visibility = Visibility.Collapsed;
                 }
-                else if (_isFullscreen)
+                else
                 {
-                    ToggleFullscreen();
+                    Close();
                 }
                 e.Handled = true;
                 break;
+        }
+    }
+
+    private void Window_TextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (TxtTagSearch.IsFocused) return;
+        if (_isCropMode || _isHorizonMode || _isPerspectiveMode) return;
+        if (DeleteConfirmOverlay.Visibility == Visibility.Visible ||
+            UpdateOverlay.Visibility == Visibility.Visible ||
+            AboutOverlay.Visibility == Visibility.Visible) return;
+
+        if (e.Text == "/")
+        {
+            FitToScreen();
+            RevealHud();
+            e.Handled = true;
+        }
+        else if (e.Text == "*")
+        {
+            NativeSize();
+            RevealHud();
+            e.Handled = true;
         }
     }
 
@@ -1194,30 +1258,124 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PromptDeleteCurrent()
+    #region Delete & Settings Management
+
+    private bool _deleteWithoutConfirmation = false;
+
+    private void LoadSettings()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\myView");
+            if (key != null)
+            {
+                var val = key.GetValue("DeleteWithoutConfirmation");
+                if (val is int intVal)
+                {
+                    _deleteWithoutConfirmation = (intVal != 0);
+                }
+            }
+        }
+        catch { }
+        SyncDeleteUi();
+    }
+
+    private void SaveDeleteSetting(bool noConfirm)
+    {
+        _deleteWithoutConfirmation = noConfirm;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\myView");
+            key?.SetValue("DeleteWithoutConfirmation", noConfirm ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { }
+        SyncDeleteUi();
+    }
+
+    private void SyncDeleteUi()
+    {
+        if (ChkDeleteNoConfirm != null)
+            ChkDeleteNoConfirm.IsChecked = _deleteWithoutConfirmation;
+        if (MenuDeleteNoConfirm != null)
+            MenuDeleteNoConfirm.IsChecked = _deleteWithoutConfirmation;
+    }
+
+    private void PromptDeleteCurrent(bool forceNoConfirm = false)
     {
         var item = _folderNav.CurrentItem;
         if (item == null) return;
 
-        var result = MessageBox.Show(
-            $"Are you sure you want to delete this file?\n\n{item.FileName}",
-            "Delete Confirmation - myView",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result == MessageBoxResult.Yes)
+        if (forceNoConfirm || _deleteWithoutConfirmation)
         {
-            try
-            {
-                File.Delete(item.FilePath);
-                _folderNav.RemoveCurrent();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Could not delete file:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            ExecuteDeleteCurrent();
+        }
+        else
+        {
+            TxtDeleteFileName.Text = item.FileName;
+            ChkDeleteDontAskAgain.IsChecked = false;
+            DeleteConfirmOverlay.Visibility = Visibility.Visible;
         }
     }
+
+    private void ExecuteDeleteCurrent()
+    {
+        var item = _folderNav.CurrentItem;
+        if (item == null) return;
+
+        try
+        {
+            File.Delete(item.FilePath);
+            _folderNav.RemoveCurrent();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not delete file:\n{ex.Message}", "myView", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void DeleteConfirmOverlay_BackgroundMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource == DeleteConfirmOverlay)
+        {
+            DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void DeleteConfirmCard_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void BtnCancelDelete_Click(object sender, RoutedEventArgs e)
+    {
+        DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void BtnConfirmDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChkDeleteDontAskAgain.IsChecked == true)
+        {
+            SaveDeleteSetting(true);
+        }
+        DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+        ExecuteDeleteCurrent();
+    }
+
+    private void MenuDelete_Click(object sender, RoutedEventArgs e) => PromptDeleteCurrent();
+
+    private void MenuDeleteNoConfirm_Click(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        SaveDeleteSetting(MenuDeleteNoConfirm.IsChecked);
+    }
+
+    private void ChkDeleteNoConfirm_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        SaveDeleteSetting(ChkDeleteNoConfirm.IsChecked == true);
+    }
+
+    #endregion
 
     #endregion
 

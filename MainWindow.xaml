@@ -12,6 +12,7 @@
         Focusable="True"
         Loaded="Window_Loaded"
         KeyDown="Window_KeyDown"
+        TextInput="Window_TextInput"
         SizeChanged="Window_SizeChanged"
         Drop="Window_Drop"
         DragOver="Window_DragOver">
@@ -34,8 +35,8 @@
         <Border Grid.Row="0"
                 x:Name="TopHeaderOverlay"
                 Height="42"
-                Background="#D9111116"
-                BorderBrush="#252530"
+                Background="#535353"
+                BorderBrush="#383838"
                 BorderThickness="0,0,0,1">
             <Grid Margin="12,0,0,0">
                 <Grid.ColumnDefinitions>
@@ -50,7 +51,7 @@
                     <TextBlock Text="myView" FontWeight="Bold" FontSize="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,14,0" />
 
                     <!-- Position Counter Pill -->
-                    <Border x:Name="CounterBadge" Background="#232330" CornerRadius="10" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed">
+                    <Border x:Name="CounterBadge" Background="#383838" CornerRadius="10" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed">
                         <TextBlock x:Name="TxtCounter" Text="0 / 0" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                     </Border>
 
@@ -60,14 +61,14 @@
 
                 <!-- Center: Image Dimensions, File Size & Decode Speed -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border x:Name="PillMetaInfo" Background="#1A1A24" CornerRadius="12" Padding="12,3" Visibility="Collapsed">
+                    <Border x:Name="PillMetaInfo" Background="#444444" CornerRadius="12" Padding="12,3" Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock x:Name="TxtResolution" Text="" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,8,0" />
-                            <TextBlock Text="•" FontSize="11.5" Foreground="#555566" Margin="0,0,8,0" />
+                            <TextBlock Text="•" FontSize="11.5" Foreground="#888888" Margin="0,0,8,0" />
                             <TextBlock x:Name="TxtFileSize" Text="" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0" />
-                            <TextBlock Text="•" FontSize="11.5" Foreground="#555566" Margin="0,0,8,0" />
+                            <TextBlock Text="•" FontSize="11.5" Foreground="#888888" Margin="0,0,8,0" />
                             <TextBlock x:Name="TxtFormat" Text="" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
-                            <TextBlock Text="•" FontSize="11.5" Foreground="#555566" Margin="0,0,8,0" />
+                            <TextBlock Text="•" FontSize="11.5" Foreground="#888888" Margin="0,0,8,0" />
                             <TextBlock x:Name="TxtSpeed" Text="⚡ 0 ms" FontSize="11" Foreground="#10B981" />
                         </StackPanel>
                     </Border>
@@ -79,7 +80,7 @@
                     <Button x:Name="BtnUpdateAvailable"
                             Click="BtnUpdateAvailable_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Background="#251640"
+                            Background="#3D2B52"
                             BorderBrush="#A855F7"
                             BorderThickness="1"
                             Foreground="#E9D5FF"
@@ -105,10 +106,10 @@
                     <Button x:Name="BtnAbout"
                             Click="BtnAbout_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Background="#1F1F2B"
-                            BorderBrush="#333345"
+                            Background="#444444"
+                            BorderBrush="#5A5A5A"
                             BorderThickness="1"
-                            Foreground="{StaticResource TextSecondaryBrush}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
                             Cursor="Hand"
                             Padding="10,3"
                             Margin="0,0,8,0"
@@ -128,10 +129,10 @@
                     <Button x:Name="BtnSortMode"
                             Click="BtnSort_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Background="#1F1F2B"
-                            BorderBrush="#333345"
+                            Background="#444444"
+                            BorderBrush="#5A5A5A"
                             BorderThickness="1"
-                            Foreground="{StaticResource TextSecondaryBrush}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
                             Cursor="Hand"
                             Padding="10,3"
                             Margin="0,0,12,0"
@@ -168,7 +169,7 @@
         <Grid Grid.Row="1" ClipToBounds="True">
             <!-- Main Viewport for Image Display -->
             <Border x:Name="ViewportBorder"
-                    Background="#0A0A0D"
+                    Background="#262626"
                     ClipToBounds="True"
                     SizeChanged="ViewportBorder_SizeChanged"
                     MouseDown="Viewport_MouseDown"
@@ -188,8 +189,14 @@
                         <MenuItem Header="🔄 Περιστροφή Αριστερά 90°" InputGestureText="L" Click="BtnRotateLeft_Click" />
                         <MenuItem Header="↔️ Οριζόντια Αναστροφή" InputGestureText="H" Click="BtnFlipH_Click" />
                         <Separator />
+                        <MenuItem Header="🔍 Προσαρμογή στην Οθόνη" InputGestureText="F, /" Click="BtnFit_Click" />
+                        <MenuItem Header="🔍 Πραγματικό Μέγεθος 100%" InputGestureText="1, *" Click="BtnNative_Click" />
+                        <Separator />
+                        <MenuItem Header="🗑️ Διαγραφή Αρχείου" InputGestureText="Del" Click="MenuDelete_Click" />
+                        <MenuItem x:Name="MenuDeleteNoConfirm" Header="⚡ Διαγραφή χωρίς επιβεβαίωση" IsCheckable="True" Click="MenuDeleteNoConfirm_Click" />
+                        <Separator />
                         <MenuItem Header="ℹ️ Πληροφορίες EXIF" InputGestureText="I" Click="BtnExif_Click" />
-                        <MenuItem Header="⚙️ Περί &amp; Προεπιλογές" InputGestureText="F1" Click="BtnAbout_Click" />
+                        <MenuItem Header="⚙️ Περί &amp; Ρυθμίσεις" InputGestureText="F1" Click="BtnAbout_Click" />
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Canvas x:Name="ImageCanvas" ClipToBounds="False">
@@ -206,10 +213,10 @@
 
             <!-- Empty State / Welcome Screen (Shown when no image is loaded) -->
             <Border x:Name="EmptyStateOverlay"
-                    Background="#101015"
+                    Background="#262626"
                     Visibility="Visible">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="520">
-                    <Border Width="96" Height="96" CornerRadius="24" Background="#1C1C24" BorderBrush="#2F2F3D" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,20">
+                    <Border Width="96" Height="96" CornerRadius="24" Background="#383838" BorderBrush="#535353" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,20">
                         <Image Source="app_icon_256.png" Width="72" Height="72" />
                     </Border>
                     <TextBlock Text="myView" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6" />
@@ -278,7 +285,7 @@
                 </Button>
 
                 <!-- Divider -->
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="6,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="6,0" />
 
                 <!-- Zoom Controls -->
                 <Button Style="{StaticResource HudIconButton}" Click="BtnZoomOut_Click" ToolTip="Zoom Out (-)">
@@ -289,9 +296,9 @@
                         Background="Transparent"
                         BorderThickness="0"
                         Cursor="Hand"
-                        ToolTip="Reset to 100% (1)"
+                        ToolTip="Reset to 100% (1, *)"
                         Margin="2,0">
-                    <Border Background="#222230" CornerRadius="12" Padding="8,4">
+                    <Border Background="#484848" CornerRadius="12" Padding="8,4">
                         <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
                     </Border>
                 </Button>
@@ -299,15 +306,15 @@
                 <Button Style="{StaticResource HudIconButton}" Click="BtnZoomIn_Click" ToolTip="Zoom In (+)">
                     <Path Data="{StaticResource IconZoomIn}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
-                <Button Style="{StaticResource HudIconButton}" Click="BtnFit_Click" ToolTip="Fit to Screen (F)">
+                <Button Style="{StaticResource HudIconButton}" Click="BtnFit_Click" ToolTip="Fit to Screen (F, /, 0)">
                     <Path Data="{StaticResource IconFit}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
-                <Button Style="{StaticResource HudIconButton}" Click="BtnNative_Click" ToolTip="1:1 Actual Size (1)">
+                <Button Style="{StaticResource HudIconButton}" Click="BtnNative_Click" ToolTip="1:1 Actual Size (1, *)">
                     <Path Data="{StaticResource IconNative}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
 
                 <!-- Divider -->
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="6,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="6,0" />
 
                 <!-- Rotate & Flip -->
                 <Button Style="{StaticResource HudIconButton}" Click="BtnRotateLeft_Click" ToolTip="Rotate Left 90° (L)">
@@ -341,7 +348,7 @@
                 </Button>
 
                 <!-- Divider -->
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="6,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="6,0" />
 
                 <!-- EXIF Toggle -->
                 <Button x:Name="BtnExifToggle" Style="{StaticResource HudIconButton}" Click="BtnExif_Click" ToolTip="Toggle EXIF Metadata (I)">
@@ -366,8 +373,8 @@
                 VerticalAlignment="Stretch"
                 Width="380"
                 Margin="0"
-                Background="#EB111116"
-                BorderBrush="#292938"
+                Background="#F2383838"
+                BorderBrush="#535353"
                 BorderThickness="1,0,0,0"
                 Visibility="Collapsed">
             <Border.Effect>
@@ -405,7 +412,7 @@
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="0,0,8,0">
                         <!-- Camera & Exposure Card -->
-                        <Border Background="#181822" CornerRadius="12" BorderBrush="#262636" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Border Background="#2D2D2D" CornerRadius="12" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="CAMERA &amp; SHOT" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" />
 
@@ -414,19 +421,19 @@
 
                                 <!-- Exposure Badges WrapPanel -->
                                 <WrapPanel Margin="0,0,0,6">
-                                    <Border Background="#242434" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
+                                    <Border Background="#3D3D3D" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
                                         <TextBlock x:Name="ExifShutter" Text="1/250s" FontSize="12" FontWeight="SemiBold" Foreground="#60A5FA" />
                                     </Border>
-                                    <Border Background="#242434" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
+                                    <Border Background="#3D3D3D" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
                                         <TextBlock x:Name="ExifAperture" Text="f/2.8" FontSize="12" FontWeight="SemiBold" Foreground="#34D399" />
                                     </Border>
-                                    <Border Background="#242434" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
+                                    <Border Background="#3D3D3D" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
                                         <TextBlock x:Name="ExifIso" Text="ISO 100" FontSize="12" FontWeight="SemiBold" Foreground="#FBBF24" />
                                     </Border>
-                                    <Border Background="#242434" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
+                                    <Border Background="#3D3D3D" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
                                         <TextBlock x:Name="ExifFocal" Text="50mm" FontSize="12" FontWeight="SemiBold" Foreground="#F472B6" />
                                     </Border>
-                                    <Border Background="#242434" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
+                                    <Border Background="#3D3D3D" CornerRadius="6" Padding="8,4" Margin="0,0,6,6">
                                         <TextBlock x:Name="ExifBias" Text="0 EV" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
                                     </Border>
                                 </WrapPanel>
@@ -443,7 +450,7 @@
                         </Border>
 
                         <!-- Image File Info Card -->
-                        <Border Background="#181822" CornerRadius="12" BorderBrush="#262636" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Border Background="#2D2D2D" CornerRadius="12" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="FILE &amp; DIMENSIONS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" />
 
@@ -475,7 +482,7 @@
                         </Border>
 
                         <!-- Additional Shooting Conditions Card -->
-                        <Border Background="#181822" CornerRadius="12" BorderBrush="#262636" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Border Background="#2D2D2D" CornerRadius="12" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="SHOOTING CONDITIONS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" />
 
@@ -499,13 +506,13 @@
                         </Border>
 
                         <!-- GPS Location Card -->
-                        <Border x:Name="CardGps" Background="#181822" CornerRadius="12" BorderBrush="#262636" BorderThickness="1" Padding="14" Margin="0,0,0,14" Visibility="Collapsed">
+                        <Border x:Name="CardGps" Background="#2D2D2D" CornerRadius="12" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14" Visibility="Collapsed">
                             <StackPanel>
                                 <TextBlock Text="GPS LOCATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" />
                                 <TextBlock x:Name="ExifGpsCoords" Text="-" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
                                 <Button Click="BtnOpenMap_Click"
-                                        Background="#252536"
+                                        Background="#3D3D3D"
                                         Foreground="{StaticResource AccentBrush}"
                                         BorderThickness="0"
                                         Padding="12,6"
@@ -525,14 +532,14 @@
                         </Border>
 
                         <!-- Complete Raw Tag Tree (All Tags Explorer) -->
-                        <Border Background="#181822" CornerRadius="12" BorderBrush="#262636" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Border Background="#2D2D2D" CornerRadius="12" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="ALL METADATA TAGS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8" />
                                 <TextBox x:Name="TxtTagSearch"
                                          TextChanged="TxtTagSearch_TextChanged"
-                                         Background="#20202C"
+                                         Background="#222222"
                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                         BorderBrush="#333346"
+                                         BorderBrush="#535353"
                                          BorderThickness="1"
                                          Padding="8,5"
                                          FontSize="12"
@@ -640,7 +647,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,24"
-                Background="#F013131A"
+                Background="#F0383838"
                 BorderBrush="{StaticResource AccentBrush}"
                 BorderThickness="1"
                 CornerRadius="22"
@@ -653,13 +660,13 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
                     <Path Data="{StaticResource IconCrop}" Fill="{StaticResource AccentBrush}" Width="15" Height="15" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
                     <TextBlock Text="Περικοπή:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <Border Background="#20202E" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
+                    <Border Background="#484848" CornerRadius="8" Padding="8,3" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtCropDimensions" Text="0 × 0 px" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                     </Border>
                 </StackPanel>
 
                 <!-- Divider -->
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,12,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="0,0,12,0" />
 
                 <!-- Save As Button -->
                 <Button x:Name="BtnCropSaveAs"
@@ -684,7 +691,7 @@
                 <!-- Overwrite Button -->
                 <Button x:Name="BtnCropOverwrite"
                         Click="BtnCropOverwrite_Click"
-                        Background="#252538"
+                        Background="#444444"
                         BorderBrush="#FF8C00"
                         BorderThickness="1"
                         Foreground="#FFB040"
@@ -752,7 +759,7 @@
 
             <!-- Angle readout badge floating along the line -->
             <Border x:Name="HorizonCenterBadge"
-                    Background="#EB121218"
+                    Background="#EB383838"
                     BorderBrush="{StaticResource AccentBrush}"
                     BorderThickness="1"
                     CornerRadius="10"
@@ -769,7 +776,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,24"
-                Background="#F013131A"
+                Background="#F0383838"
                 BorderBrush="{StaticResource AccentBrush}"
                 BorderThickness="1"
                 CornerRadius="22"
@@ -804,7 +811,7 @@
                 </Button>
 
                 <!-- Angle display pill & Reset -->
-                <Button Click="BtnHorizonReset_Click" Background="#20202E" BorderBrush="#333346" BorderThickness="1" Padding="8,3" Cursor="Hand" ToolTip="Επαναφορά σε 0.0°" Margin="0,0,10,0">
+                <Button Click="BtnHorizonReset_Click" Background="#484848" BorderBrush="#5A5A5A" BorderThickness="1" Padding="8,3" Cursor="Hand" ToolTip="Επαναφορά σε 0.0°" Margin="0,0,10,0">
                     <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
                     <TextBlock x:Name="TxtHorizonAngle" Text="0.0°" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                 </Button>
@@ -814,7 +821,7 @@
                     <TextBlock Text="Αυτόματο Crop" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                 </CheckBox>
 
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,12,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="0,0,12,0" />
 
                 <Button Click="BtnHorizonSaveAs_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" Padding="14,6" Margin="0,0,8,0" Cursor="Hand">
                     <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
@@ -824,7 +831,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Click="BtnHorizonOverwrite_Click" Background="#252538" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
+                <Button Click="BtnHorizonOverwrite_Click" Background="#444444" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
                     <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
                     <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
                 </Button>
@@ -898,7 +905,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,24"
-                Background="#F013131A"
+                Background="#F0383838"
                 BorderBrush="{StaticResource AccentBrush}"
                 BorderThickness="1"
                 CornerRadius="22"
@@ -911,7 +918,7 @@
                 <TextBlock Text="Προοπτική / Skew:" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
                 <!-- Mode Toggle (Keystone Warp vs Quad Crop) -->
-                <Border Background="#20202E" CornerRadius="8" Padding="2" Margin="0,0,10,0" VerticalAlignment="Center">
+                <Border Background="#484848" CornerRadius="8" Padding="2" Margin="0,0,10,0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="BtnModeKeystone" Click="BtnModeKeystone_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="11" Padding="8,3" Cursor="Hand" ToolTip="Άνοιγμα / κλείσιμο γωνιών (Keystone)">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6" /></Style></Button.Resources>
@@ -943,7 +950,7 @@
                     <Button Click="BtnKeystoneInc_Click" Style="{StaticResource HudIconButton}" Width="22" Height="22" ToolTip="+1% (Άνοιγμα)" Margin="0,0,6,0">
                         <TextBlock Text="+" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                     </Button>
-                    <Border Background="#20202E" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
+                    <Border Background="#484848" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtKeystoneValue" Text="0%" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" MinWidth="28" TextAlignment="Center" />
                     </Border>
                 </StackPanel>
@@ -964,12 +971,12 @@
                 </CheckBox>
 
                 <!-- Reset Button -->
-                <Button Click="BtnPerspectiveReset_Click" Background="#20202E" BorderBrush="#333346" BorderThickness="1" Padding="8,4" Cursor="Hand" ToolTip="Επαναφορά γωνιών στην αρχική θέση" Margin="0,0,10,0">
+                <Button Click="BtnPerspectiveReset_Click" Background="#484848" BorderBrush="#5A5A5A" BorderThickness="1" Padding="8,4" Cursor="Hand" ToolTip="Επαναφορά γωνιών στην αρχική θέση" Margin="0,0,10,0">
                     <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8" /></Style></Button.Resources>
                     <TextBlock Text="🔄 Reset" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 </Button>
 
-                <Rectangle Width="1" Height="20" Fill="#2E2E3C" Margin="0,0,10,0" />
+                <Rectangle Width="1" Height="20" Fill="#535353" Margin="0,0,10,0" />
 
                 <!-- Save As -->
                 <Button Click="BtnPerspectiveSaveAs_Click" Background="{StaticResource AccentBrush}" Foreground="#000000" FontWeight="Bold" FontSize="12" Padding="14,6" Margin="0,0,8,0" Cursor="Hand">
@@ -981,7 +988,7 @@
                 </Button>
 
                 <!-- Overwrite -->
-                <Button Click="BtnPerspectiveOverwrite_Click" Background="#252538" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
+                <Button Click="BtnPerspectiveOverwrite_Click" Background="#444444" BorderBrush="#FF8C00" BorderThickness="1" Foreground="#FFB040" FontWeight="SemiBold" FontSize="12" Padding="12,6" Margin="0,0,8,0" Cursor="Hand">
                     <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style></Button.Resources>
                     <TextBlock Text="⚠️ Αντικατάσταση" VerticalAlignment="Center" />
                 </Button>
@@ -1018,11 +1025,11 @@
                 Grid.Row="0" Grid.RowSpan="2"
                 Panel.ZIndex="1000"
                 shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                Background="#CC050508"
+                Background="#B31A1A1A"
                 Visibility="Collapsed"
                 MouseDown="AboutOverlay_BackgroundMouseDown">
-            <Border Background="#161622"
-                    BorderBrush="#2C2C40"
+            <Border Background="#383838"
+                    BorderBrush="#535353"
                     BorderThickness="1.5"
                     CornerRadius="20"
                     MaxWidth="540"
@@ -1044,22 +1051,22 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="12" Background="#20202E" BorderBrush="#35354A" BorderThickness="1" Margin="0,0,12,0">
+                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="12" Background="#444444" BorderBrush="#5A5A5A" BorderThickness="1" Margin="0,0,12,0">
                             <Image Source="app_icon_256.png" Width="34" Height="34" />
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="myView" FontSize="19" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
-                                <Border Background="#252538" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.9" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <Border Background="#484848" CornerRadius="8" Padding="6,2" VerticalAlignment="Center">
+                                    <TextBlock Text="v1.1.0" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </Border>
                                 <Border x:Name="BadgeUpdateStatus" Background="#14281E" BorderBrush="#10B981" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
                                     <TextBlock x:Name="TxtBadgeUpdateStatus" Text="✓ Τελευταία έκδοση" FontSize="10" FontWeight="SemiBold" Foreground="#10B981" />
                                 </Border>
                                 <Button x:Name="BtnAboutUpdateAction"
                                         Click="BtnAboutUpdateAction_Click"
-                                        Background="#2D1B4E"
+                                        Background="#3D2B52"
                                         BorderBrush="#A855F7"
                                         BorderThickness="1"
                                         Foreground="#E9D5FF"
@@ -1077,7 +1084,7 @@
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                 <TextBlock Text="Ultra-Fast Image &amp; Vector Viewer for Windows" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                                <TextBlock Text=" • " FontSize="12" Foreground="#444455" />
+                                <TextBlock Text=" • " FontSize="12" Foreground="#888888" />
                                 <Button Click="BtnManualCheckUpdate_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0">
                                     <TextBlock x:Name="TxtManualCheckUpdate" Text="🔄 Έλεγχος για ενημερώσεις" FontSize="11" Foreground="#60A5FA" TextDecorations="Underline" />
                                 </Button>
@@ -1089,10 +1096,10 @@
                         </Button>
                     </Grid>
 
-                    <Rectangle Height="1" Fill="#262636" Margin="0,0,0,16" />
+                    <Rectangle Height="1" Fill="#484848" Margin="0,0,0,16" />
 
                     <!-- Creator Profile Card -->
-                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                    <Border Background="#2D2D2D" CornerRadius="14" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -1112,9 +1119,9 @@
                                            FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
 
                                 <Button Click="BtnOpenPlarg_Click"
-                                        Background="#262638"
+                                        Background="#3D3D3D"
                                         Foreground="{StaticResource AccentBrush}"
-                                        BorderBrush="#383850"
+                                        BorderBrush="#535353"
                                         BorderThickness="1"
                                         Padding="10,4"
                                         Cursor="Hand"
@@ -1131,7 +1138,7 @@
                     </Border>
 
                     <!-- Default Apps Card -->
-                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                    <Border Background="#2D2D2D" CornerRadius="14" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -1151,7 +1158,7 @@
                             <Button Grid.Column="1"
                                     x:Name="BtnSetAsDefault"
                                     Click="BtnSetAsDefault_Click"
-                                    Background="#252538"
+                                    Background="#3D3D3D"
                                     BorderBrush="{StaticResource AccentBrush}"
                                     BorderThickness="1"
                                     Foreground="{StaticResource AccentBrush}"
@@ -1170,8 +1177,38 @@
                         </Grid>
                     </Border>
 
+                    <!-- Settings Card (Ρυθμίσεις & Επιλογές) -->
+                    <Border Background="#2D2D2D" CornerRadius="14" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="⚙️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Επιλογές Διαγραφής (Delete)" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="Διαγραφή εικόνας χωρίς εμφάνιση παραθύρου επιβεβαίωσης."
+                                           FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <CheckBox x:Name="ChkDeleteNoConfirm"
+                                      Grid.Column="1"
+                                      Content="Χωρίς επιβεβαίωση"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      FontSize="12"
+                                      FontWeight="SemiBold"
+                                      VerticalAlignment="Center"
+                                      Cursor="Hand"
+                                      Checked="ChkDeleteNoConfirm_Changed"
+                                      Unchecked="ChkDeleteNoConfirm_Changed" />
+                        </Grid>
+                    </Border>
+
                     <!-- License Card (CC BY-NC 4.0) -->
-                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,16">
+                    <Border Background="#2D2D2D" CornerRadius="14" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,16">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                 <TextBlock Text="⚖️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
@@ -1215,12 +1252,12 @@
         <!-- Update Dialog Overlay -->
         <Border x:Name="UpdateOverlay"
                 Grid.Row="0" Grid.RowSpan="2"
-                Background="#B307070A"
+                Background="#B31A1A1A"
                 Visibility="Collapsed"
                 MouseDown="UpdateOverlay_BackgroundMouseDown">
             <Border x:Name="UpdateCard"
-                    Background="#161622"
-                    BorderBrush="#383850"
+                    Background="#383838"
+                    BorderBrush="#535353"
                     BorderThickness="1.5"
                     CornerRadius="20"
                     MaxWidth="520"
@@ -1256,10 +1293,10 @@
                         </Button>
                     </Grid>
 
-                    <Rectangle Height="1" Fill="#262636" Margin="0,0,0,16" />
+                    <Rectangle Height="1" Fill="#484848" Margin="0,0,0,16" />
 
                     <!-- Version & Asset Card -->
-                    <Border Background="#1D1D28" CornerRadius="14" BorderBrush="#2C2C40" BorderThickness="1" Padding="14" Margin="0,0,0,14">
+                    <Border Background="#2D2D2D" CornerRadius="14" BorderBrush="#484848" BorderThickness="1" Padding="14" Margin="0,0,0,14">
                         <StackPanel>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -1268,11 +1305,11 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Τρέχουσα:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,6,0" />
-                                    <Border Background="#252538" CornerRadius="6" Padding="6,2" Margin="0,0,10,0">
+                                    <Border Background="#444444" CornerRadius="6" Padding="6,2" Margin="0,0,10,0">
                                         <TextBlock x:Name="TxtCurrentVersionVal" Text="v1.0.7" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
                                     </Border>
                                     <TextBlock Text="Νέα έκδοση:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,6,0" />
-                                    <Border Background="#1E2A38" BorderBrush="#00D2FF" BorderThickness="1" CornerRadius="6" Padding="6,2">
+                                    <Border Background="#2F3E48" BorderBrush="#00D2FF" BorderThickness="1" CornerRadius="6" Padding="6,2">
                                         <TextBlock x:Name="TxtNewVersionVal" Text="v1.0.8" FontSize="11" FontWeight="Bold" Foreground="#00D2FF" />
                                     </Border>
                                 </StackPanel>
@@ -1282,7 +1319,7 @@
                             </Grid>
 
                             <TextBlock Text="Σημειώσεις έκδοσης:" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <Border Background="#14141E" CornerRadius="8" Padding="10" MaxHeight="140">
+                            <Border Background="#222222" CornerRadius="8" Padding="10" MaxHeight="140">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <TextBlock x:Name="TxtReleaseNotes" Text="Νέες δυνατότητες και διορθώσεις." FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" LineHeight="16" />
                                 </ScrollViewer>
@@ -1296,7 +1333,7 @@
                             <TextBlock x:Name="TxtDownloadStatus" Text="Λήψη πακέτου εγκατάστασης Lite..." FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock x:Name="TxtDownloadPercent" Text="0%" HorizontalAlignment="Right" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
                         </Grid>
-                        <ProgressBar x:Name="BarDownloadProgress" Height="8" Minimum="0" Maximum="100" Value="0" Background="#1D1D28" Foreground="{StaticResource AccentBrush}" BorderThickness="0">
+                        <ProgressBar x:Name="BarDownloadProgress" Height="8" Minimum="0" Maximum="100" Value="0" Background="#2D2D2D" Foreground="{StaticResource AccentBrush}" BorderThickness="0">
                             <ProgressBar.Resources>
                                 <Style TargetType="Border"><Setter Property="CornerRadius" Value="4" /></Style>
                             </ProgressBar.Resources>
@@ -1315,7 +1352,7 @@
                             <TextBlock Text="Προβολή στο GitHub ↗" FontSize="11" TextDecorations="Underline" />
                         </Button>
 
-                        <Button Grid.Column="1" x:Name="BtnCancelUpdate" Click="BtnCloseUpdate_Click" Padding="18,9" Background="#252538" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
+                        <Button Grid.Column="1" x:Name="BtnCancelUpdate" Click="BtnCloseUpdate_Click" Padding="18,9" Background="#444444" BorderBrush="#5A5A5A" BorderThickness="1" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" FontSize="12" Cursor="Hand" Margin="0,0,8,0">
                             <Button.Resources>
                                 <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
                             </Button.Resources>
@@ -1331,6 +1368,104 @@
                             </StackPanel>
                         </Button>
                     </Grid>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Delete Confirmation Modal Overlay -->
+        <Border x:Name="DeleteConfirmOverlay"
+                Grid.Row="0" Grid.RowSpan="2"
+                Panel.ZIndex="1005"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                Background="#B31A1A1A"
+                Visibility="Collapsed"
+                MouseDown="DeleteConfirmOverlay_BackgroundMouseDown">
+            <Border Background="#383838"
+                    BorderBrush="#535353"
+                    BorderThickness="1.5"
+                    CornerRadius="18"
+                    MaxWidth="450"
+                    Margin="24"
+                    Padding="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MouseDown="DeleteConfirmCard_MouseDown">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" ShadowDepth="6" Direction="270" Color="#000000" Opacity="0.75" />
+                </Border.Effect>
+
+                <StackPanel>
+                    <!-- Header -->
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="38" Height="38" CornerRadius="10" Background="#4A2528" BorderBrush="#EF4444" BorderThickness="1" Margin="0,0,12,0">
+                            <TextBlock Text="🗑️" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Επιβεβαίωση Διαγραφής" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Διαγραφή αρχείου από το δίσκο" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </StackPanel>
+
+                        <Button Grid.Column="2" Style="{StaticResource HudIconButton}" Width="30" Height="30" Click="BtnCancelDelete_Click" ToolTip="Ακύρωση (Esc)">
+                            <Path Data="{StaticResource IconClose}" Fill="{StaticResource TextSecondaryBrush}" Width="10" Height="10" Stretch="Uniform" />
+                        </Button>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#484848" Margin="0,0,0,14" />
+
+                    <!-- Message Body -->
+                    <TextBlock Text="Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το αρχείο;" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+
+                    <Border Background="#2A2A2A" CornerRadius="8" BorderBrush="#484848" BorderThickness="1" Padding="10,8" Margin="0,0,0,14">
+                        <TextBlock x:Name="TxtDeleteFileName" Text="image.jpg" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis" />
+                    </Border>
+
+                    <!-- Do not ask again checkbox -->
+                    <CheckBox x:Name="ChkDeleteDontAskAgain"
+                              Content="Να μην ερωτηθώ ξανά (Διαγραφή χωρίς επιβεβαίωση)"
+                              Foreground="{StaticResource TextSecondaryBrush}"
+                              FontSize="12"
+                              Cursor="Hand"
+                              Margin="2,0,0,18" />
+
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Click="BtnCancelDelete_Click"
+                                Padding="16,8"
+                                Background="#444444"
+                                Foreground="{StaticResource TextPrimaryBrush}"
+                                BorderBrush="#5A5A5A"
+                                BorderThickness="1"
+                                FontWeight="SemiBold"
+                                FontSize="12.5"
+                                Cursor="Hand"
+                                Margin="0,0,10,0">
+                            <Button.Resources>
+                                <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                            </Button.Resources>
+                            <TextBlock Text="Ακύρωση (Esc)" />
+                        </Button>
+
+                        <Button Click="BtnConfirmDelete_Click"
+                                Padding="18,8"
+                                Background="#EF4444"
+                                Foreground="#FFFFFF"
+                                FontWeight="Bold"
+                                FontSize="12.5"
+                                BorderThickness="0"
+                                Cursor="Hand">
+                            <Button.Resources>
+                                <Style TargetType="Border"><Setter Property="CornerRadius" Value="10" /></Style>
+                            </Button.Resources>
+                            <TextBlock Text="Διαγραφή (Enter)" />
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Border>
