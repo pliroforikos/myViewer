@@ -243,8 +243,7 @@ public static class HealingService
                 if (!image.HasAlpha) image.HasAlpha = true;
 
                 using var pixels = image.GetPixels();
-                byte[] rawBytes = pixels.ToByteArray(PixelMapping.BGRA) ??
-                                  pixels.ToByteArray(PixelMapping.RGBA)!;
+                byte[] rawBytes = pixels.ToByteArray(PixelMapping.RGBA)!;
 
                 foreach (var spot in spots)
                 {
@@ -282,6 +281,7 @@ public static class HealingService
             string destExt = Path.GetExtension(destPath).ToLowerInvariant();
             if (destExt == ".jpg" || destExt == ".jpeg")
             {
+                if (image.HasAlpha) image.HasAlpha = false;
                 image.Format = MagickFormat.Jpeg;
                 image.Quality = 95;
             }
